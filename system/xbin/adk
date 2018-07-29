@@ -1,0 +1,22 @@
+#!/system/bin/sh
+# App Data Keeper (adk) APK Restorer
+# (c) 2018, VR25 @ xda-developers
+# License: GPL v3+
+
+# verbose engine
+logsDir=/data/media/adk/logs
+newLog=$logsDir/res_apks_verbose_log.txt
+oldLog=$logsDir/res_apks_verbose_previous_log.txt
+[[ -d $logsDir ]] || mkdir -p -m 777 $logsDir
+[[ -f $newLog ]] && mv $newLog $oldLog
+set -x 2>>$newLog
+
+modID=adk
+modPath=/sbin/.core/img/$modID
+[[ -f $modPath/module.prop ]] || modPath=/magisk/$modID
+[[ -f $modPath/module.prop ]] || \
+  { echo -e "\n(!) Unsupported Magisk version or not running as root (su)\n"; exit 1; }
+
+. $modPath/adk.sh
+res_apks
+exit 0

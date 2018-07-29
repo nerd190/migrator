@@ -1,0 +1,60 @@
+#!/sbin/sh
+# App Data Keeper (adk) Rollback'er
+# (c) 2018, VR25 @ xda-developers
+# License: GPL v3+
+
+
+is_mounted() { mountpoint -q "$1"; }
+
+mount_image() {
+  e2fsck -fy $IMG &>/dev/null
+  if [ ! -d "$2" ]; then
+    mount -o remount,rw /
+    mkdir -p "$2"
+  fi
+  if (! is_mounted $2); then
+    LOOPDEVICE=
+    for LOOP in 0 1 2 3 4 5 6 7; do
+      if (! is_mounted $2); then
+        LOOPDEVICE=/dev/block/loop$LOOP
+        [ -f "$LOOPDEVICE" ] || mknod $LOOPDEVICE b 7 $LOOP 2>/dev/null
+        losetup $LOOPDEVICE $1
+        if [ "$?" -eq "0" ]; then
+          mount -t ext4 -o loop $LOOPDEVICE $2
+          is_mounted $2 || /system/bin/toolbox mount -t ext4 -o loop $LOOPDEVICE $2
+          is_mounted $2 || /system/bin/toybox mount -t ext4 -o loop $LOOPDEVICE $2
+        fi
+        is_mounted $2 && break
+      fi
+    done
+  fi
+  if ! is_mounted $mountPoint; then
+    echo -e "\n(!) $IMG mount failed... abort\n"
+    exit 1
+  fi
+}
+
+
+mountPoint=/magisk
+
+mount /data 2>/dev/null
+
+[ -d /data/adb/magisk ] && IMG=/data/adb/magisk.img || IMG=/data/magisk.img
+
+if [ ! -d /data/adb/magisk ] && [ ! -d /data/magisk ]; then
+	echo -e "\n(!) No Magisk installation found or installed version is not supported\n"
+	exit 1
+fi
+
+mount_image $IMG $mountPoint
+
+
+. /tmp/adk.sh
+resdata
+
+
+umount $mountPoint || echo
+losetup -d $LOOPDEVICE || echo
+rmdir $mountPoint || echo
+echo -e "- Goodbye.\n"
+exit 0
