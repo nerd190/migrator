@@ -10,13 +10,8 @@ ps | grep zygote | grep -v grep >/dev/null && bootMode=true || bootMode=false
 $bootMode || ps -A 2>/dev/null | grep zygote | grep -v grep >/dev/null && bootMode=true
 $bootMode || id | grep -q 'uid=0' || bootMode=true
 
-# add Magisk busybox to PATH
-$bootMode && export PATH="/sbin/.core/busybox:/dev/magisk/bin:$PATH"
-
 # default perms
 umask 022
-
-
 
 ui_print() {
   $bootMode && echo -e "$1" || echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
@@ -243,18 +238,19 @@ ui_print "- Extracting module files"
 unzip -o "$ZIP" -d $INSTALLER >&2
 cd $INSTALLER
 mv bin/rsync_$binArch $tmpModPath/bin/rsync
-mv common/adk.sh system $tmpModPath/ >&2
-[[ -f /data/.badk ]] && mv -f /data/.badk $modData/
-[[ -f $modData/.badk ]] && mv $tmpModPath/system/xbin $tmpModPath/system/bin
+mv common/* $tmpModPath/
+[[ ! -d /system/xbin && ! -d /system_root/system/xbin ]] && \
+  mv $tmpModPath/system/xbin $tmpModPath/system/bin
 mv -f Changelog.md License.md README.md $modInfo/
 
 # recovery rollback helper
 if ! $bootMode; then
   cp $tmpModPath/adk.sh /tmp/
-  mv common/adk /sbin/
+  mv $tmpModPath/adk /sbin/
   set_perm /sbin/adk 0 0 755
   set_perm /tmp/adk.sh 0 0 755
 fi
+$bootMode && rm $tmpModPath/adk
 
 ##########################################################################################
 
@@ -262,9 +258,6 @@ fi
 
 # auto-mount
 mktouch $tmpModPath/auto_mount
-
-# prop files
-cp $INSTALLER/common/system.prop $tmpModPath/ 2>/dev/null
 
 # module info
 cp $INSTALLER/module.prop $tmpModPath/
@@ -274,12 +267,6 @@ if $bootMode; then
   mktouch $modPath/update
   cp $INSTALLER/module.prop $modPath/
 fi
-
-# post-fs-data mode scripts
-cp $INSTALLER/common/post-fs-data.sh $tmpModPath/ 2>/dev/null
-
-# service mode scripts
-cp -af $INSTALLER/common/service.sh $tmpModPath/ 2>/dev/null
 
 ui_print "- Setting permissions"
 set_permissions

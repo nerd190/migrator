@@ -6,7 +6,7 @@
 
 #### DISCLAIMER
 
-- This software is provided as is, in the hope that it will be useful, but without any warranty. Always read the reference prior to installing/updating. While no cats have been harmed in any way, shape or form, I assume no responsibility under anything that might go wrong due to the use/misuse of it.
+- This software is provided as is, in the hope that it will be useful, but without any warranty. Always read the reference prior to installing/updating. While no cats have been harmed, I assume no responsibility under anything that might go wrong due to the use/misuse of it.
 - A copy of the GNU General Public License, version 3 or newer ships with every build. Please, read it prior to using, modifying and/or sharing any part of this work.
 - To avoid fraud, DO NOT mirror any link associated with the project.
 
@@ -31,12 +31,12 @@
 
 - First Time
 0. Backup your user apps data (RECOMMENDED).
-1. Install adk from Magisk Manager or TWRP.
+1. Install from Magisk Manager or TWRP.
 2. Reboot.
 3. Forget.
 
 - After a Factory Reset
-1. Install adk from Magisk Manager or TWRP.
+1. Install from Magisk Manager or TWRP.
 2. Reboot.
 3. Locate your favorite backed up terminal app in `[external storage]/adk/apksBkp` or `/data/media/adk/apksBkp` and install it.
 4. Run the command `adk`, type `.` (that's a dot), press the enter key and wait. This will automatically reinstall all backed up APKs.
@@ -48,7 +48,6 @@
 #### DEBUGGING & ADVANCED INFO
 
 - logsDir=/data/media/adk/logs
-- If the module causes bootloops, run `touch /data/.badk` and reinstall. This setting is persistent across updates. Clear by removing `/data/media/adk/.badk`.
 - Package names of user and UPDATED system apps placed in /data/media/adk/config.txt are ignored (blacklisted). Other system packages placed in the same file are whitelisted. In other words, including system package names in config.txt whitelists them, whereas user and updated system apps are blacklisted. The reasoning behind this is that non-update-able (i.e., through Play Store) system apps are usually incompatible across different ROM's. Thus, their data is left in /data/data. Only user and updated system apps' data is moved to the safer location.
 - While in recovery and after flashing the module, the command `adk` is available for rolling back all changes and completely uninstalling adk.
 
@@ -56,12 +55,17 @@
 
 #### ONLINE SUPPORT
 
-- [Git Repository](https://github.com/Magisk-Modules-Repo/*PENDING*)
-- [XDA Thread](https://forum.xda-developers.com/apps/magisk/*PENDING*)
+- [Git Repository](https://github.com/Magisk-Modules-Repo/App-Data-Keeper)
+- [XDA Thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278)
 
 
 
 #### RECENT CHANGES
+
+**2018.7.29 (201807290)**
+- Auto-detect whether adk should go to bin or xbin dir to avoid bootloops
+- General optimizations
+- Updated documentation
 
 **2018.7.28**
 - Initial release

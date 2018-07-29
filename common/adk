@@ -49,6 +49,7 @@ fi
 mount_image $IMG $mountPoint
 
 
+resdata=true
 . /tmp/adk.sh
 resdata
 

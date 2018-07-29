@@ -4,29 +4,14 @@
 # License: GPL v3+
 
 
-
 # environment
 
-PATH=/sbin/.core/busybox:/dev/magisk/bin:$PATH
 modID=adk
-
-# detect whether in bootmode
-ps | grep zygote | grep -v grep >/dev/null && bootMode=true || bootMode=false
-$bootMode || ps -A 2>/dev/null | grep zygote | grep -v grep >/dev/null && bootMode=true
-$bootMode || id | grep -q 'uid=0' || bootMode=true
-
-if ! $bootMode; then
-  modPath=/sbin/.core/img/$modID
-  [[ -f $modPath/module.prop ]] || modPath=/magisk/$modID
-  [[ -f $modPath/module.prop ]] || \
-    { echo -e "\n(!) Unsupported Magisk version or not running as root (su)\n"; exit 1; }
-fi
-
-PATH=$modPath/bin:$PATH
 modData=/data/media/$modID
+config=$modData/config.txt
 appData=$modData/.appData
 apksBkp=$modData/apksBkp
-config=$modData/config.txt
+[[ -z $resdata ]] && PATH=/sbin/.core/busybox:/dev/magisk/bin
 
 
 # read installed apks (in post fs data mode)
@@ -114,7 +99,7 @@ bkp_apks() {
   wait4sd
   find /data/app -type f -name base.apk | \
     while read line; do
-      rsync -c --partial $line "$apksBkp/$(dirname $line | sed 's:/data/app/::; s:-[1-2]::').apk"
+       $modPath/bin/rsync -c --partial $line "$apksBkp/$(dirname $line | sed 's:/data/app/::; s:-[1-2]::').apk"
     done
 }
 
