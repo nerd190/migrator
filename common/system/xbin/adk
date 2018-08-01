@@ -21,6 +21,6 @@ modPath=/sbin/.core/img/$modID
 [[ -f $modPath/module.prop ]] || \
   { echo -e "\n(!) modPath not found\n"; exit 1; }
 
-. $modPath/$modID.sh
+. $modPath/core.sh
 $functionName
 exit 0

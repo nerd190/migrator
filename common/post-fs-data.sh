@@ -4,22 +4,18 @@
 # License: GPL v3+
 
 
-main() {
-  modID=adk
-  modPath=${0%/*}
-  functionName=main
-  modData=/data/media/$modID
+modID=adk
+modPath=${0%/*}
+functionName=main
+modData=/data/media/$modID
 
-  # verbosity engine
-  logsDir=$modData/logs
-  newLog=$logsDir/${functionName}_verbose_log.txt
-  oldLog=$logsDir/${functionName}_verbose_previous_log.txt
-  [[ -d $logsDir ]] || mkdir -p $logsDir
-  [[ -f $newLog ]] && mv $newLog $oldLog
-  set -x 2>>$newLog
+# verbosity engine
+logsDir=$modData/logs
+newLog=$logsDir/${functionName}_verbose_log.txt
+oldLog=$logsDir/${functionName}_verbose_previous_log.txt
+[[ -d $logsDir ]] || mkdir -p $logsDir
+[[ -f $newLog ]] && mv $newLog $oldLog
+set -x 2>>$newLog
 
-  . $modPath/adk.sh
-  $functionName
-}
-
-(main) &
+. $modPath/core.sh
+$functionName

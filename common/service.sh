@@ -18,7 +18,7 @@ main() {
   [[ -f $newLog ]] && mv $newLog $oldLog
   set -x 2>>$newLog
 
-  . $modPath/adk.sh
+  . $modPath/core.sh
   $functionName
 }
 

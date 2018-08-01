@@ -13,16 +13,16 @@ mount_image() {
     mkdir -p "$2"
   fi
   if (! is_mounted $2); then
-    LOOPDEVICE=
+    loopDevice=
     for LOOP in 0 1 2 3 4 5 6 7; do
       if (! is_mounted $2); then
-        LOOPDEVICE=/dev/block/loop$LOOP
-        [ -f "$LOOPDEVICE" ] || mknod $LOOPDEVICE b 7 $LOOP 2>/dev/null
-        losetup $LOOPDEVICE $1
+        loopDevice=/dev/block/loop$LOOP
+        [ -f "$loopDevice" ] || mknod $loopDevice b 7 $LOOP 2>/dev/null
+        losetup $loopDevice $1
         if [ "$?" -eq "0" ]; then
-          mount -t ext4 -o loop $LOOPDEVICE $2
-          is_mounted $2 || /system/bin/toolbox mount -t ext4 -o loop $LOOPDEVICE $2
-          is_mounted $2 || /system/bin/toybox mount -t ext4 -o loop $LOOPDEVICE $2
+          mount -t ext4 -o loop $loopDevice $2
+          is_mounted $2 || /system/bin/toolbox mount -t ext4 -o loop $loopDevice $2
+          is_mounted $2 || /system/bin/toybox mount -t ext4 -o loop $loopDevice $2
         fi
         is_mounted $2 && break
       fi
@@ -50,12 +50,12 @@ mount_image $IMG $mountPoint
 
 
 resdata=true
-. /tmp/adk.sh
+. /tmp/core.sh
 resdata
 
 
-umount $mountPoint || echo
-losetup -d $LOOPDEVICE || echo
-rmdir $mountPoint || echo
+umount $mountPoint
+losetup -d $loopDevice
+rmdir $mountPoint
 echo -e "- Goodbye.\n"
 exit 0

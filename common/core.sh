@@ -11,7 +11,7 @@ modData=/data/media/$modID
 config=$modData/config.txt
 appData=$modData/.appData
 apksBkp=$modData/apksBkp
-[[ -z $resdata ]] && PATH=/sbin/.core/busybox:/dev/magisk/bin
+[ -z "$resdata" ] && PATH=/sbin/.core/busybox:/dev/magisk/bin
 
 
 # read installed apks (in post fs data mode)
@@ -27,7 +27,7 @@ main() {
     -f /data/app/$(echo $line | awk '{print $1}')\-2/base.apk ]]
     then
       if grep -q "$(echo $line | awk '{print $1}')" $config 2>/dev/null; then
-        if [[ $(ls $appData/$(echo $line | awk '{print $1}') 2>/dev/null) ]]; then
+        if [ -n "$(ls "$appData/$(echo $line | awk '{print $1}')" 2>/dev/null)" ]; then
           bindf $line system
         else
           movef $line
@@ -36,7 +36,7 @@ main() {
       fi
     else
       if ! grep -q "$(echo $line | awk '{print $1}')" $config 2>/dev/null; then
-        if [[ $(ls $appData/$(echo $line | awk '{print $1}') 2>/dev/null) ]]; then
+        if [ -n "$(ls "$appData/$(echo $line | awk '{print $1}')" 2>/dev/null)" ]; then
           bindf $line user
         else
           movef $line
@@ -50,7 +50,7 @@ main() {
 
 # $1=pkgName
 movef() {
-  if [ "$2" = restore ]; then
+  if [ "$2" = "restore" ]; then
     # restore all app data in $appData to /data/data
     for line in $appData/*; do
       rm -rf /data/data/$line 2>/dev/null
@@ -106,6 +106,8 @@ bkp_apks() {
 
 # restore apks (from terminal)
 res_apks() {
+  oPATH=$PATH
+  PATH=/sbin/.core/busybox:/dev/magisk/bin:$PATH
   echo
   wait4sd
   cd $apksBkp
@@ -115,9 +117,10 @@ res_apks() {
   echo
   ls -1 | grep -E "$pattern" 2>/dev/null | \
     while read line; do
-      [[ -n $line ]] && { echo -n "Installing $line..."; echo " $(pm install -r $line)"; }
+      [ -n "$line" ] && { echo -n "Installing $line..."; echo " $(pm install -r $line)"; }
     done
   echo
+  PATH=$oPATH
 }
 
 
@@ -127,7 +130,7 @@ resdata () {
   read ans
   if echo "$ans" | grep -iq y; then
     echo -e "\nPlease wait...\n"
-    movef restore || echo
-    rm -rf $mountPoint/adk /data/media/adk || echo
+    movef restore
+    [ "$?" -eq "0" ] && rm -rf $mountPoint/adk $modData
   fi
 }
