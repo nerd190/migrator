@@ -64,12 +64,16 @@
 
 #### LATEST CHANGES
 
+**2018.8.2-1 (201808021)**
+- Filter out config lines starting with '#'
+- Fixed "pm not found" bug
+
 **2018.8.2 (201808020)**
 - Auto-move excluded apps data back to /data/media
 - Fixed adk issues in recovery mode
 - General optimizations (more modular code)
 - Improved safety mechanisms to prevent data loss in "fatal error" situations
-- Use rsync to copy app data folders attributes instead of using `mkdir -m`
+- Updated documentation
 
 **2018.8.1 (201808010)**
 - Do not run post-fs-data.sh in a background subshell
@@ -77,11 +81,3 @@
 - General optimizations
 - Striped down (removed unnecessary code & files)
 - Updated documentation
-
-**2018.7.29 (201807290)**
-- Auto-detect whether adk should go to bin or xbin dir to avoid bootloops
-- General optimizations
-- Updated documentation
-
-**2018.7.28**
-- Initial release

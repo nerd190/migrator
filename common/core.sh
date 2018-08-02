@@ -11,7 +11,7 @@ modData=/data/media/$modID
 config=$modData/config.txt
 appData=$modData/.appData
 apksBkp=$modData/apksBkp
-[ -z "$resdata" ] && PATH=/sbin/.core/busybox:/dev/magisk/bin
+[ -z "$resdata" ] && PATH=/sbin/.core/busybox:/dev/magisk/bin:$PATH
 
 
 # read installed apks (in post fs data mode)
@@ -25,13 +25,13 @@ main() {
     if echo "$line" | grep -q '/system/' && ! \
     [[ -f /data/app/$(pkg_name)\-1/base.apk || \
     -f /data/app/$(pkg_name)\-2/base.apk ]]; then
-      if grep -q "$(pkg_name)" $config 2>/dev/null; then
+      if grep -v '^#' $config 2>/dev/null | grep -q "$(pkg_name)"; then
         lsck system
       else
         restore_excluded
       fi
     else
-      if ! grep -q "$(pkg_name)" $config 2>/dev/null; then
+      if ! grep -v '^#' $config 2>/dev/null | grep -q "$(pkg_name)"; then
         lsck user
       else
         restore_excluded
@@ -124,8 +124,6 @@ bkp_apks() {
 
 # restore apks (from terminal)
 res_apks() {
-  oPATH=$PATH
-  PATH=/sbin/.core/busybox:/dev/magisk/bin:$PATH
   echo
   wait4sd
   cd $apksBkp
@@ -138,7 +136,6 @@ res_apks() {
       [ -n "$line" ] && { echo -n "Installing $line..."; echo " $(pm install -r $line)"; }
     done
   echo
-  PATH=$oPATH
 }
 
 
