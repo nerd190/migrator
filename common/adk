@@ -57,5 +57,5 @@ resdata
 umount $mountPoint
 losetup -d $loopDevice
 rmdir $mountPoint
-echo -e "- Goodbye.\n"
+echo -e "- End\n"
 exit 0

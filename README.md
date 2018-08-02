@@ -50,6 +50,7 @@
 
 - logsDir=/data/media/adk/logs
 - Package names of user and UPDATED system apps placed in /data/media/adk/config.txt are ignored (blacklisted). Other system packages placed in the same file are whitelisted. In other words, including system package names in config.txt whitelists them, whereas user and updated system apps are blacklisted. The reasoning behind this is that non-update-able (i.e., through Play Store) system apps are usually incompatible across different ROM's. Thus, their data is left in /data/data. Only user and updated system apps data is moved to the safer location.
+- Issues with a particular package? Exclude it from adk list by adding its name (i.e., `com.spotify.music`) to /data/media/adk/config.txt. Note: by default, this file doesn't exist.
 - While in recovery and after flashing the module, the command `adk` is available for rolling back all changes and completely uninstalling adk.
 
 
@@ -62,6 +63,13 @@
 
 
 #### LATEST CHANGES
+
+**2018.8.2 (201808020)**
+- Auto-move excluded apps data back to /data/media
+- Fixed adk issues in recovery mode
+- General optimizations (more modular code)
+- Improved safety mechanisms to prevent data loss in "fatal error" situations
+- Use rsync to copy app data folders attributes instead of using `mkdir -m`
 
 **2018.8.1 (201808010)**
 - Do not run post-fs-data.sh in a background subshell

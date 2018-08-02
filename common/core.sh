@@ -23,45 +23,63 @@ main() {
   awk '{print $2,$3}' | sed 's:"::g; s:name=::; s:codePath=::' | \
   while read line; do
     if echo "$line" | grep -q '/system/' && ! \
-    [[ -f /data/app/$(echo $line | awk '{print $1}')\-1/base.apk || \
-    -f /data/app/$(echo $line | awk '{print $1}')\-2/base.apk ]]
-    then
-      if grep -q "$(echo $line | awk '{print $1}')" $config 2>/dev/null; then
-        if [ -n "$(ls "$appData/$(echo $line | awk '{print $1}')" 2>/dev/null)" ]; then
-          bindf $line system
-        else
-          movef $line
-          bindf $line system
-        fi
+    [[ -f /data/app/$(pkg_name)\-1/base.apk || \
+    -f /data/app/$(pkg_name)\-2/base.apk ]]; then
+      if grep -q "$(pkg_name)" $config 2>/dev/null; then
+        lsck system
+      else
+        restore_excluded
       fi
     else
-      if ! grep -q "$(echo $line | awk '{print $1}')" $config 2>/dev/null; then
-        if [ -n "$(ls "$appData/$(echo $line | awk '{print $1}')" 2>/dev/null)" ]; then
-          bindf $line user
-        else
-          movef $line
-          bindf $line user
-        fi
+      if ! grep -q "$(pkg_name)" $config 2>/dev/null; then
+        lsck user
+      else
+        restore_excluded
       fi
     fi
   done
 }
 
 
+# bind-mount or move & bind-mount
+# $1=user or system
+lsck() {
+  if [ -n "$(ls "$appData/$(pkg_name)" 2>/dev/null)" ]; then
+    bindf $line $1
+  else
+    movef $line
+    bindf $line $1
+  fi
+}
+
+
+pkg_name() { echo $line | awk '{print $1}'; }
+
+
+restore_excluded() {
+  if [ -n "$(ls "$appData/$(pkg_name)" 2>/dev/null)" ]; then
+    rm -rf "/data/data/$(pkg_name)"
+    mv "$appData/$(pkg_name)" /data/data/
+  fi
+}
+
+
 # $1=pkgName
 movef() {
-  if [ "$2" = "restore" ]; then
+  if [ "$1" = "restore" ]; then
     # restore all app data in $appData to /data/data
-    for line in $appData/*; do
-      rm -rf /data/data/$line 2>/dev/null
-      mv -f $appData/$line /data/data/
+    for line in $(ls $appData); do
+      rm -rf "/data/data/$line" 2>/dev/null
+      mv "$appData/$line" /data/data/
     done
   else
     # move app data to $appData
-    [[ -d $appData ]] || mkdir -p -m 777 $appData
     rm -rf $appData/$1 2>/dev/null
-    mv -f /data/data/$1 $appData/
-    mkdir -m 777 "/data/data/$1" 2>/dev/null
+    mkdir -p $appData/${1}_tmp
+    mv /data/data/$1/* $appData/${1}_tmp
+    $modPath/bin/rsync -a /data/data/$1 $appData/
+    mv $appData/${1}_tmp/* $appData/$1
+    rmdir $appData/${1}_tmp
   fi
 }
 
