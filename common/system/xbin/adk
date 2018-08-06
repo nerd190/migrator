@@ -4,22 +4,29 @@
 # License: GPL v3+
 
 
+set -u
+
 modID=adk
 functionName=res_apks
 modData=/data/media/$modID
-
-# verbosity engine
 logsDir=$modData/logs
 newLog=$logsDir/${functionName}_verbose_log.txt
 oldLog=$logsDir/${functionName}_verbose_previous_log.txt
-[[ -d $logsDir ]] || mkdir -p $logsDir
+
+# use Magisk's busybox
+[ -d /sbin/.core/busybox ] && PATH=/sbin/.core/busybox:$PATH \
+  || PATH=/dev/magisk/bin:$PATH
+
+  # verbose generator
+mkdir -p $logsDir 2>/dev/null
 [[ -f $newLog ]] && mv $newLog $oldLog
 set -x 2>>$newLog
 
+# find modPath
 modPath=/sbin/.core/img/$modID
 [[ -f $modPath/module.prop ]] || modPath=/magisk/$modID
-[[ -f $modPath/module.prop ]] || \
-  { echo -e "\n(!) modPath not found\n"; exit 1; }
+[[ -f $modPath/module.prop ]] \
+  || { echo -e "\n(!) modPath not found\n"; exit 1; }
 
 . $modPath/core.sh
 $functionName

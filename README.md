@@ -64,6 +64,11 @@
 
 #### LATEST CHANGES
 
+**2018.8.6 (201808060)**
+- Additional safety switches
+- Do not wait for sdcard while on terminal
+- General optimizations
+
 **2018.8.2-1 (201808021)**
 - Filter out config lines starting with '#'
 - Fixed "pm not found" bug
@@ -73,11 +78,4 @@
 - Fixed adk issues in recovery mode
 - General optimizations (more modular code)
 - Improved safety mechanisms to prevent data loss in "fatal error" situations
-- Updated documentation
-
-**2018.8.1 (201808010)**
-- Do not run post-fs-data.sh in a background subshell
-- Fixed "pm not found" when trying to restore APK's
-- General optimizations
-- Striped down (removed unnecessary code & files)
 - Updated documentation

@@ -4,14 +4,11 @@
 # License: GPL v3+
 
 
-# environment
-
 modID=adk
 modData=/data/media/$modID
 config=$modData/config.txt
 appData=$modData/.appData
 apksBkp=$modData/apksBkp
-[ -z "$resdata" ] && PATH=/sbin/.core/busybox:/dev/magisk/bin:$PATH
 
 
 # read installed apks (in post fs data mode)
@@ -64,7 +61,7 @@ restore_excluded() {
 }
 
 
-# $1=pkgName
+# $1=pkgName or "restore"
 movef() {
   if [ "$1" = "restore" ]; then
     # restore all app data in $appData to /data/data
@@ -99,14 +96,16 @@ bindf() {
 
 # wait 90 seconds for external storage
 wait4sd() {
-  count=0
-  until [ "$count" -ge 360 ]; do
-    ((count++))
-    grep -q '/mnt/media_rw' /proc/mounts && break || sleep 4
-  done
-    grep -q '/mnt/media_rw' /proc/mounts && \
-      apksBkp="$(ls -1d /mnt/media_rw/* | head -n1)/$modID/apksBkp"
-  [[ -d $apksBkp ]] || mkdir -p $apksBkp
+  if [ "$1" != "nowait" ]; then
+    count=0
+    until [ "$count" -ge 360 ]; do
+      ((count++))
+      grep -q '/mnt/media_rw' /proc/mounts && break || sleep 4
+    done
+  fi
+  grep -q '/mnt/media_rw' /proc/mounts \
+    && apksBkp="$(ls -1d /mnt/media_rw/* | head -n1)/$modID/apksBkp"
+  mkdir -p $apksBkp 2>/dev/null
 }
 
 
@@ -122,10 +121,10 @@ bkp_apks() {
 }
 
 
-# restore apks (from terminal)
+# batch restore apks from terminal
 res_apks() {
   echo
-  wait4sd
+  wait4sd nowait
   cd $apksBkp
   ls -1
   echo -e "\nInput matching pattern (or nothing to cancel)..."
@@ -139,7 +138,7 @@ res_apks() {
 }
 
 
-# rollback all app data (from recovery only)
+# rollback all app data from recovery
 resdata () {
   echo -e "\nMove all app data back to /data/data (y/N) and uninstall adk?"
   read ans
