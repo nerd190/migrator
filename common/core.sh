@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # App Data Keeper (adk) Core
-# (c) 2018, VR25 @ xda-developers
+# Copyright (C) 2018, VR25 @ xda-developers
 # License: GPL v3+
 
 

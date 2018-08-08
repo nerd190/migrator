@@ -1,6 +1,6 @@
 #!/sbin/sh -x
 # App Data Keeper (adk) Installer
-# (c) 2018, VR25 @ xda-developers
+# Copyright (C) 2018, VR25 @ xda-developers
 # License: GPL v3+
 
 # detect whether in bootmode

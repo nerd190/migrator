@@ -1,5 +1,5 @@
 # App Data Keeper (adk) 
-## (c) 2018, VR25 @ xda-developers
+## Copyright (C) 2018, VR25 @ xda-developers
 ### License: GPL v3+
 
 
@@ -64,6 +64,10 @@
 
 #### LATEST CHANGES
 
+**2018.8.8 (201808080)**
+- Disable ESDFS & SDCARDFS and enable FUSE (might increase compatibility)
+  *Release notes:* follow all safety guidelines strictly. Don't curse me if something goes wrong either because "reasons" or you forgot to feed your cat beforehand. I've been cursed enough times already. Still, somehow managed to stay alive and cool to this day.
+
 **2018.8.6 (201808060)**
 - Additional safety switches
 - Do not wait for sdcard while on terminal
@@ -72,10 +76,3 @@
 **2018.8.2-1 (201808021)**
 - Filter out config lines starting with '#'
 - Fixed "pm not found" bug
-
-**2018.8.2 (201808020)**
-- Auto-move excluded apps data back to /data/media
-- Fixed adk issues in recovery mode
-- General optimizations (more modular code)
-- Improved safety mechanisms to prevent data loss in "fatal error" situations
-- Updated documentation
