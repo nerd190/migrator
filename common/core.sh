@@ -11,24 +11,25 @@ appData=$modData/.appData
 apksBkp=$modData/apksBkp
 
 
-# read installed apks (in post fs data mode)
+# read installed apks (in post-fs-data mode)
 # treat updated system apps as user apps
-# check white (system) and black (user) lists (include/exclude)
-# blacklisting rules also apply to system apps treated as user apps
 main() {
   grep 'package name' /data/system/packages.xml | \
   awk '{print $2,$3}' | sed 's:"::g; s:name=::; s:codePath=::' | \
   while read line; do
-    if echo "$line" | grep -q '/system/' && ! \
-    [[ -f /data/app/$(pkg_name)\-1/base.apk || \
-    -f /data/app/$(pkg_name)\-2/base.apk ]]; then
-      if grep -v '^#' $config 2>/dev/null | grep -q "$(pkg_name)"; then
+    if echo "$line" | grep -q '/system/' \
+      && ! [[ -f /data/app/$(pkg_name)\-1/base.apk || -f /data/app/$(pkg_name)\-2/base.apk ]]
+    then
+      if grep -q "^inc $(pkg_name)" $config 2>/dev/null; then
         lsck system
       else
         restore_excluded
       fi
     else
-      if ! grep -v '^#' $config 2>/dev/null | grep -q "$(pkg_name)"; then
+      if ! grep -q "^exc $(pkg_name)" $config 2>/dev/null \
+        || { grep -q '^exc$' $config \
+          && grep -q "^inc $(pkg_name)" $config; } 2>/dev/null
+      then
         lsck user
       else
         restore_excluded

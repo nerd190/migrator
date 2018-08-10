@@ -49,7 +49,6 @@ fi
 
 mount_image $IMG $mountPoint
 
-resdata=true
 . /tmp/core.sh
 resdata
 
