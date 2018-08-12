@@ -21,4 +21,5 @@ set -x 2>>$newLog
 
 . $modPath/core.sh
 $functionName
+wait
 exit 0

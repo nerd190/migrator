@@ -66,6 +66,11 @@
 
 #### LATEST CHANGES
 
+**2018.8.12 (201808120)**
+Fixed "make_ext4fs not found" (devices running Android P)
+- Improved efficiency with the introduction of parallel processing
+- Miscellaneous changes
+
 **2018.8.10 (201808100)**
 - General optimizations
 - Support for `exc`, `exc pkgName` and `inc pkgName` config lines (details on the README)
@@ -74,8 +79,3 @@
 **2018.8.8 (201808080)**
 - Disable ESDFS & SDCARDFS and enable FUSE (might increase compatibility)
   *Release notes:* follow all safety guidelines strictly. Don't curse me if something goes wrong either because "reasons" or you forgot to feed your cat beforehand. I've been cursed enough times already. Still, somehow managed to stay alive and cool to this day.
-
-**2018.8.6 (201808060)**
-- Additional safety switches
-- Do not wait for sdcard while on terminal
-- General optimizations

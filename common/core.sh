@@ -21,18 +21,18 @@ main() {
       && ! [[ -f /data/app/$(pkg_name)\-1/base.apk || -f /data/app/$(pkg_name)\-2/base.apk ]]
     then
       if grep -q "^inc $(pkg_name)" $config 2>/dev/null; then
-        lsck system
+        (lsck system) &
       else
-        restore_excluded
+        (restore_excluded) &
       fi
     else
       if ! grep -q "^exc $(pkg_name)" $config 2>/dev/null \
         || { grep -q '^exc$' $config \
           && grep -q "^inc $(pkg_name)" $config; } 2>/dev/null
       then
-        lsck user
+        (lsck user) &
       else
-        restore_excluded
+        (restore_excluded) &
       fi
     fi
   done
@@ -67,9 +67,10 @@ movef() {
   if [ "$1" = "restore" ]; then
     # restore all app data in $appData to /data/data
     for line in $(ls $appData); do
-      rm -rf "/data/data/$line" 2>/dev/null
-      mv "$appData/$line" /data/data/
+      (rm -rf "/data/data/$line" 2>/dev/null
+      mv "$appData/$line" /data/data/) &
     done
+    wait
   else
     # move app data to $appData
     rm -rf $appData/$1 2>/dev/null
