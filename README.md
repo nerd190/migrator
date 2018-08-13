@@ -66,6 +66,11 @@
 
 #### LATEST CHANGES
 
+**2018.8.13 (201808130)**
+- Backup APK's more efficiently
+- Fixed "parameter not set", leading to APK's not being backed up, and other issues
+  *Release note*: a Magisk 16.7 bug causes adk to generate empty logs (set -x doesn't work properly)
+
 **2018.8.12 (201808120)**
 Fixed "make_ext4fs not found" (devices running Android P)
 - Improved efficiency with the introduction of parallel processing
@@ -75,7 +80,3 @@ Fixed "make_ext4fs not found" (devices running Android P)
 - General optimizations
 - Support for `exc`, `exc pkgName` and `inc pkgName` config lines (details on the README)
 - Updated reference
-
-**2018.8.8 (201808080)**
-- Disable ESDFS & SDCARDFS and enable FUSE (might increase compatibility)
-  *Release notes:* follow all safety guidelines strictly. Don't curse me if something goes wrong either because "reasons" or you forgot to feed your cat beforehand. I've been cursed enough times already. Still, somehow managed to stay alive and cool to this day.

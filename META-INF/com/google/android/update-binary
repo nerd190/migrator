@@ -284,4 +284,20 @@ fi
 
 ui_print "- End"
 ui_print " "
+
+##########################################################################################
+# module-specific code
+##########################################################################################
+
+ui_print "WHAT'S NEW
+  Backup APK's more efficiently
+  Fixed \"parameter not set\", leading to APK's not being backed up, and other issues
+"
+
+grep -q '16\.7' /data/adb/magisk/util_functions.sh 2>/dev/null \
+  && ui_print "*Note*: a Magisk 16.7 bug causes adk to generate empty logs (\"set -x\" doesn't work properly)
+"
+
+##########################################################################################
+
 exit 0

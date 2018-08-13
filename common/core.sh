@@ -86,7 +86,7 @@ movef() {
 # $1=pkgName, $3=user or system
 bindf() {
   if [ "$3" = "user" ]; then
-    if [[ -f /data/app/${1}\-1/base.apk || -f /data/app/${1}\-2/base.apk ]]; then
+    if [ -f /data/app/${1}\-1/base.apk -o -f /data/app/${1}\-2/base.apk ]; then
       rm -rf /data/data/$1/* 2>/dev/null # cleanup obsolete data
       mount -o bind $appData/$1 /data/data/$1
     fi
@@ -98,16 +98,19 @@ bindf() {
 
 # wait 90 seconds for external storage
 wait4sd() {
+  set +u
   if [ "$1" != "nowait" ]; then
+    set -u
     count=0
     until [ "$count" -ge 360 ]; do
       ((count++))
       grep -q '/mnt/media_rw' /proc/mounts && break || sleep 4
     done
   fi
+  set -u
   grep -q '/mnt/media_rw' /proc/mounts \
     && apksBkp="$(ls -1d /mnt/media_rw/* | head -n1)/$modID/apksBkp"
-  mkdir -p $apksBkp 2>/dev/null
+  [ -d "$apksBkp" ] || mkdir -p $apksBkp
 }
 
 
@@ -118,7 +121,7 @@ bkp_apks() {
   wait4sd
   find /data/app -type f -name base.apk | \
     while read line; do
-       $modPath/bin/rsync -c --partial $line "$apksBkp/$(dirname $line | sed 's:/data/app/::; s:-[1-2]::').apk"
+       $modPath/bin/rsync -u --inplace --partial $line "$apksBkp/$(dirname $line | sed 's:/data/app/::; s:-[1-2]::').apk"
     done
 }
 
@@ -132,11 +135,13 @@ res_apks() {
   echo -e "\nInput matching pattern (or nothing to cancel)..."
   read pattern
   echo
+  set +u
   ls -1 | grep -E "$pattern" 2>/dev/null | \
     while read line; do
       [ -n "$line" ] && { echo -n "Installing $line..."; echo " $(pm install -r $line)"; }
     done
   echo
+  set -u
 }
 
 
