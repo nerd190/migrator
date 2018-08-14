@@ -7,7 +7,7 @@
 set -u
 
 modID=adk
-functionName=res_apks
+functionName=restore_apps
 modData=/data/media/$modID
 logsDir=$modData/logs
 newLog=$logsDir/${functionName}_verbose_log.txt
@@ -19,7 +19,7 @@ oldLog=$logsDir/${functionName}_verbose_previous_log.txt
 
   # verbose generator
 mkdir -p $logsDir 2>/dev/null
-[[ -f $newLog ]] && mv $newLog $oldLog
+[ -f "$newLog" ] && mv $newLog $oldLog
 set -x 2>>$newLog
 
 # find modPath

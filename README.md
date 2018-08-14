@@ -34,6 +34,7 @@
 1. Backup your user and updated system apps data, just in case something goes sideways (I warned you twice).
 2. Install adk from Magisk Manager or TWRP.
 3. Reboot.
+3. 1. *Reboot again if you find any issue*
 4. Forget.
 
 - After a Factory Reset
@@ -42,23 +43,26 @@
 3. Locate your favorite backed up terminal app in `[external storage]/adk/apksBkp` or `/data/media/adk/apksBkp` and install it.
 4. Run the command `adk`, type `.` (that's a dot), press the enter key and wait. This will automatically reinstall all backed up APKs.
 5. Reboot.
+5.1. *Reboot again if you find any issue*
 6. Forget.
 
 
 
 #### DEBUGGING & ADVANCED INFO
 
+- If you find any issue after installing/updating, *reboot again* before attempting the rollback procedure described below.
 - Config file: /data/media/adk/config.txt
 - logsDir: /data/media/adk/logs
 - Only user and updated system apps data is moved to the safer location. The reasoning behind this is that non-update-able (i.e., through Play Store) system apps are usually incompatible across different ROM's. The `inc pkgName` config line overrides this for that particular package.
 - Issues with a package? Exclude it from adk list with the config line `exc pkgName` (i.e., `exc com.spotify.music`).
 - A bare `exc` means "exclude all packages". When used in combination with `inc pkgName`, it works as "exclude all but this package and that package and...".
-- While in recovery and after flashing the module, the command `adk` is available for rolling back all changes and completely uninstalling adk.
+- While in recovery and after flashing the module, the command `adk` is available for *rolling back all changes* and completely uninstalling adk.
 
 
 
-#### ONLINE SUPPORT
+#### LINKS
 
+- [Facebook Page](https://facebook.com/VR25-at-xda-developers-258150974794782)
 - [Git Repository](https://github.com/Magisk-Modules-Repo/App-Data-Keeper)
 - [XDA Thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278)
 
@@ -66,17 +70,18 @@
 
 #### LATEST CHANGES
 
+**2018.8.14 (201808140)**
+- Fixed install failure from MM (Android P, Magisk 16.7)
+- Major optimizations for greater efficiency
+- Simplified code documentation
+- Updated reference and module description
+
 **2018.8.13 (201808130)**
 - Backup APK's more efficiently
 - Fixed "parameter not set", leading to APK's not being backed up, and other issues
   *Release note*: a Magisk 16.7 bug causes adk to generate empty logs (set -x doesn't work properly)
 
 **2018.8.12 (201808120)**
-Fixed "make_ext4fs not found" (devices running Android P)
+- Fixed "make_ext4fs not found" (devices running Android P)
 - Improved efficiency with the introduction of parallel processing
 - Miscellaneous changes
-
-**2018.8.10 (201808100)**
-- General optimizations
-- Support for `exc`, `exc pkgName` and `inc pkgName` config lines (details on the README)
-- Updated reference

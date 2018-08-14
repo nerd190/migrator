@@ -140,6 +140,7 @@ fi
 tmpDir=/dev/tmp
 INSTALLER=$tmpDir/install
 mountPath=$tmpDir/magisk_img
+magiskBin=/data/adb/magisk/magisk
 $bootMode && imgName=magisk_merge.img || imgName=magisk.img
 [ -d /data/adb/magisk ] && IMG=/data/adb/$imgName || IMG=/data/$imgName
 
@@ -190,16 +191,16 @@ if [ -f "$IMG" ]; then
   if [ "$reqSizeM" -gt "$curFreeM" ]; then
     SIZE=$(((reqSizeM + curUsedM) / 32 * 32 + 64))
     ui_print "- Resizing $IMG to ${SIZE}M..."
-    [ -f /data/adb/magisk/magisk ] \
-      && /data/adb/magisk/magisk --resizeimg $IMG $SIZE >&2 \
-      || resize2fs $IMG ${SIZE}M >&2
+    $magiskBin imgtool resize $IMG $SIZE >&2 \
+      || $magiskBin --resizeimg $IMG $SIZE >&2 \
+        || resize2fs $IMG ${SIZE}M >&2
   fi
 else
   SIZE=$((reqSizeM / 32 * 32 + 64));
   ui_print "- Creating $IMG with size ${SIZE}M"
-  [ -f /data/adb/magisk/magisk ] \
-    && /data/adb/magisk/magisk --createimg $IMG $SIZE >&2 \
-    || make_ext4fs -l ${SIZE}M $IMG >&2
+  $magiskBin imgtool create $IMG $SIZE >&2 \
+    || $magiskBin --createimg $IMG $SIZE >&2 \
+      || make_ext4fs -l ${SIZE}M $IMG >&2
 fi
 
 mount_image $IMG $mountPath
@@ -272,9 +273,9 @@ image_size_check $IMG
 NEWDATASIZE=$((curUsedM / 32 * 32 + 32))
 if [ "$curSizeM" -gt "$NEWDATASIZE" ]; then
   ui_print "- Shrinking $IMG to ${NEWDATASIZE}M..."
-  [ -f /data/adb/magisk/magisk ] \
-    && /data/adb/magisk/magisk --resizeimg $IMG $SIZE >&2 \
-    || resize2fs $IMG ${SIZE}M >&2
+  $magiskBin imgtool resize $IMG $SIZE >&2 \
+    || $magiskBin --resizeimg $IMG $SIZE >&2 \
+      || resize2fs $IMG ${SIZE}M >&2
 fi
 
 if ! $bootMode; then
@@ -289,14 +290,21 @@ ui_print " "
 # module-specific code
 ##########################################################################################
 
-ui_print "WHAT'S NEW
-  Backup APK's more efficiently
-  Fixed \"parameter not set\", leading to APK's not being backed up, and other issues
-"
+ui_print "  Facebook Suport Page: https://facebook.com"
+ui_print "    /VR25-at-xda-developers-258150974794782/"
+ui_print " "
+
+ui_print "  WHAT'S NEW"
+  ui_print "    Fixed install failure from MM (Android P, Magisk v16.7)"
+  ui_print "    Major optimizations for greater efficiency"
+  ui_print "    Simplified code documentation"
+  ui_print "    Updated reference and module description"
+  ui_print "    "
 
 grep -q '16\.7' /data/adb/magisk/util_functions.sh 2>/dev/null \
-  && ui_print "*Note*: a Magisk 16.7 bug causes adk to generate empty logs (\"set -x\" doesn't work properly)
-"
+  && ui_print "  *Note*: a Magisk 16.7 bug causes $modID to" \
+  && ui_print "    generate empty logs (\"set -x\" doesn't work)" \
+  && ui_print " "
 
 ##########################################################################################
 

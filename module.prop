@@ -1,7 +1,7 @@
 id=adk
 name=App Data Keeper
-version=2018.8.13
-versionCode=201808130
+version=2018.8.14
+versionCode=201808140
 author=VR25 @ xda-developers
-description=Make apps data survive the standard TWRP factory reset. Auto-backup installed APK's. Batch restore apps with ease after factory resets. No setup required -- install and forget. WARNING: backup your data before trying this for the first time (just in case something goes sideways).
+description=Make apps data survive the standard TWRP factory reset. Auto-backup installed APK's. Batch restore apps with ease after factory resets. No setup required -- install and forget. WARNING: backup your data before trying this for the first time (just in case something goes sideways). While in recovery and after flashing the module, the command `adk` is available for *rolling back all changes* and completely uninstalling adk. If you find any issue after installing/updating, *reboot again* before attempting the rollback procedure.
 minMagisk=1500

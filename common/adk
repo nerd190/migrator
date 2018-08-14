@@ -50,7 +50,7 @@ fi
 mount_image $IMG $mountPoint
 
 . /tmp/core.sh
-resdata
+restore_data
 
 umount $mountPoint
 losetup -d $loopDevice

@@ -10,7 +10,7 @@ main() {
 
   modID=adk
   modPath=${0%/*}
-  functionName=bkp_apks
+  functionName=bkp_apps
   modData=/data/media/$modID
   logsDir=$modData/logs
   newLog=$logsDir/${functionName}_verbose_log.txt

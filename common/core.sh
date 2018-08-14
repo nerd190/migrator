@@ -18,21 +18,21 @@ main() {
   awk '{print $2,$3}' | sed 's:"::g; s:name=::; s:codePath=::' | \
   while read line; do
     if echo "$line" | grep -q '/system/' \
-      && ! [[ -f /data/app/$(pkg_name)\-1/base.apk || -f /data/app/$(pkg_name)\-2/base.apk ]]
+      && ! [ -f /data/app/$(pkg_name)\-1/base.apk -o -f /data/app/$(pkg_name)\-2/base.apk ]
     then
       if grep -q "^inc $(pkg_name)" $config 2>/dev/null; then
-        (lsck system) &
+        (mv_bindm) &
       else
-        (restore_excluded) &
+        (restore_exc) &
       fi
     else
       if ! grep -q "^exc $(pkg_name)" $config 2>/dev/null \
         || { grep -q '^exc$' $config \
           && grep -q "^inc $(pkg_name)" $config; } 2>/dev/null
       then
-        (lsck user) &
+        (mv_bindm) &
       else
-        (restore_excluded) &
+        (restore_exc) &
       fi
     fi
   done
@@ -41,12 +41,12 @@ main() {
 
 # bind-mount or move & bind-mount
 # $1=user or system
-lsck() {
+mv_bindm() {
   if [ -n "$(ls "$appData/$(pkg_name)" 2>/dev/null)" ]; then
-    bindf $line $1
+    bindm $line
   else
     movef $line
-    bindf $line $1
+    bindm $line
   fi
 }
 
@@ -54,7 +54,7 @@ lsck() {
 pkg_name() { echo $line | awk '{print $1}'; }
 
 
-restore_excluded() {
+restore_exc() {
   if [ -n "$(ls "$appData/$(pkg_name)" 2>/dev/null)" ]; then
     rm -rf "/data/data/$(pkg_name)"
     mv "$appData/$(pkg_name)" /data/data/
@@ -74,25 +74,17 @@ movef() {
   else
     # move app data to $appData
     rm -rf $appData/$1 2>/dev/null
-    mkdir -p $appData/${1}_tmp
-    mv /data/data/$1/* $appData/${1}_tmp
-    $modPath/bin/rsync -a /data/data/$1 $appData/
-    mv $appData/${1}_tmp/* $appData/$1
-    rmdir $appData/${1}_tmp
+    mv /data/data/$1 $appData/
   fi
 }
 
 
+# bind-mount app data
 # $1=pkgName, $3=user or system
-bindf() {
-  if [ "$3" = "user" ]; then
-    if [ -f /data/app/${1}\-1/base.apk -o -f /data/app/${1}\-2/base.apk ]; then
-      rm -rf /data/data/$1/* 2>/dev/null # cleanup obsolete data
-      mount -o bind $appData/$1 /data/data/$1
-    fi
-  else
-    mount -o bind $appData/$1 /data/data/$1
-  fi
+bindm() {
+  rm -rf /data/data/$1 2>/dev/null # remove obsolete data
+  mkdir /data/data/$1
+  mount -o bind $appData/$1 /data/data/$1
 }
 
 
@@ -117,7 +109,7 @@ wait4sd() {
 # backup all apks in /data/app (in late start service mode)
 # defaultStorage=external
 # fallBackStorage=internal
-bkp_apks() {
+bkp_apps() {
   wait4sd
   find /data/app -type f -name base.apk | \
     while read line; do
@@ -127,7 +119,7 @@ bkp_apks() {
 
 
 # batch restore apks from terminal
-res_apks() {
+restore_apps() {
   echo
   wait4sd nowait
   cd $apksBkp
@@ -146,7 +138,7 @@ res_apks() {
 
 
 # rollback all app data from recovery
-resdata () {
+restore_data () {
   echo -e "\nMove all app data back to /data/data (y/N) and uninstall adk?"
   read ans
   if echo "$ans" | grep -iq y; then
