@@ -10,8 +10,8 @@ modID=adk
 functionName=restore_apps
 modData=/data/media/$modID
 logsDir=$modData/logs
-newLog=$logsDir/${functionName}_verbose_log.txt
-oldLog=$logsDir/${functionName}_verbose_previous_log.txt
+newLog=$logsDir/${functionName}.log
+oldLog=$logsDir/${functionName}_old.log
 
 # use Magisk's busybox
 [ -d /sbin/.core/busybox ] && PATH=/sbin/.core/busybox:$PATH \

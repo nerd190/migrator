@@ -26,18 +26,13 @@ is_mounted() { mountpoint -q "$1" 2>/dev/null; }
 mount_image() {
   ui_print "- Mounting $1 to $2"
   [ -d "$2" ] || mkdir -p "$2"
-  if (! is_mounted $2); then
-    loopDevice=
-    for LOOP in 0 1 2 3 4 5 6 7; do
+  if ! is_mounted $2; then
+    for n in 0 1 2 3 4 5 6 7; do
       if (! is_mounted $2); then
-        loopDevice=/dev/block/loop$LOOP
-        [ -f "$loopDevice" ] || mknod $loopDevice b 7 $LOOP 2>/dev/null
+        loopDevice=/dev/block/loop$n
+        [ -b "$loopDevice" ] || mknod $loopDevice b 7 $n 2>/dev/null
         losetup $loopDevice $1
-        if [ "$?" -eq "0" ]; then
-          mount -t ext4 -o loop $loopDevice $2
-          is_mounted $2 || /system/bin/toolbox mount -t ext4 -o loop $loopDevice $2
-          is_mounted $2 || /system/bin/toybox mount -t ext4 -o loop $loopDevice $2
-        fi
+        [ "$?" -eq "0" ] && mount -t ext4 -o loop $loopDevice $2
         is_mounted $2 && break
       fi
     done
@@ -113,7 +108,10 @@ set_permissions() {
   # The following are default permissions, DO NOT remove
   set_perm_recursive  $tmpModPath  0  0  0755  0644
 
-  for f in $tmpModPath/bin/* $(find $tmpModPath -type f -name $modID) $(find $tmpModPath -type f -name *.sh); do
+  for f in $tmpModPath/bin/* \
+    $(find $tmpModPath -type f -name $modID) \
+    $(find $tmpModPath -type f -name *.sh)
+  do
     [ -f "$f" ] && set_perm $f 0 0 0755
   done
 }
@@ -124,22 +122,21 @@ ZIP="$3"
 readlink /proc/$$/fd/$OUTFD 2>/dev/null | grep /tmp >/dev/null
 if [ "$?" -eq "0" ]; then
   OUTFD=0
-
   for FD in `ls /proc/$$/fd`; do
-  readlink /proc/$$/fd/$FD 2>/dev/null | grep pipe >/dev/null
-  if [ "$?" -eq "0" ]; then
-    ps | grep " 3 $FD " | grep -v grep >/dev/null
+    readlink /proc/$$/fd/$FD 2>/dev/null | grep pipe >/dev/null
     if [ "$?" -eq "0" ]; then
-    OUTFD=$FD
-    break
+      ps | grep " 3 $FD " | grep -v grep >/dev/null
+      if [ "$?" -eq "0" ]; then
+        OUTFD=$FD
+        break
+      fi
     fi
-  fi
   done
 fi
 
-tmpDir=/dev/tmp
-INSTALLER=$tmpDir/install
-mountPath=$tmpDir/magisk_img
+TMPDIR=/dev/tmp
+INSTALLER=$TMPDIR/install
+mountPath=$TMPDIR/magisk_img
 magiskBin=/data/adb/magisk/magisk
 $bootMode && imgName=magisk_merge.img || imgName=magisk.img
 [ -d /data/adb/magisk ] && IMG=/data/adb/$imgName || IMG=/data/$imgName
@@ -152,7 +149,7 @@ if [ ! -d /data/adb/magisk ] && [ ! -d /data/magisk ]; then
 fi
 
 # initial cleanup
-rm -rf $tmpDir 2>/dev/null
+rm -rf $TMPDIR 2>/dev/null
 mkdir -p $INSTALLER 2>/dev/null
 
 unzip -o "$ZIP" 'common/*' module.prop -d $INSTALLER >&2
@@ -178,10 +175,10 @@ fi
 print_modname
 
 $bootMode || ui_print "- Mounting partitions"
-mount -o ro /system 2>/dev/null
-mount -o ro /vendor 2>/dev/null
-mount /data 2>/dev/null
-mount /cache 2>/dev/null
+{ mount -o ro /system
+mount -o ro /vendor
+mount /data
+mount /cache; } 2>/dev/null
 
 request_zip_size_check "$ZIP"
 
@@ -211,6 +208,7 @@ mount_image $IMG $mountPath
 
 modData=/data/media/$modID
 modInfo=$modData/info
+postFsD="$(echo $modPath | sed "s/$modID//").core/post-fs-data.d"
 
 # detect CPU architecture
 case "$(uname -m)" in
@@ -222,10 +220,12 @@ esac
 [ "$(grep_prop versionCode $modPath/module.prop)" -lt "201807300" ] \
   && rm $modInfo/Change* 2>/dev/null
 
+[ "$(grep_prop versionCode $modPath/module.prop)" -lt "201808141" ] \
+  && rm -rf $modData/logs 2>/dev/null
+
 # create module paths
-rm -rf $tmpModPath 2>/dev/null
-mkdir -p $tmpModPath/bin
-mkdir -p $modInfo 2>/dev/null
+{ rm -rf $tmpModPath
+mkdir -p $tmpModPath/bin $modInfo "$postFsD"; } 2>/dev/null
 
 # extract module files
 ui_print "- Extracting module files"
@@ -233,6 +233,8 @@ unzip -o "$ZIP" -d $INSTALLER >&2
 cd $INSTALLER
 mv bin/rsync_$binArch $tmpModPath/bin/rsync
 mv common/* $tmpModPath/
+mv -f $tmpModPath/${modID}.sh "$postFsD"/
+set_perm "$postFsD/${modID}.sh" 0 0 755
 [[ ! -d /system/xbin && ! -d /system_root/system/xbin ]] \
   && mv $tmpModPath/system/xbin $tmpModPath/system/bin
 mv -f License.md README.md $modInfo/
@@ -240,11 +242,12 @@ mv -f License.md README.md $modInfo/
 # recovery rollback helper
 if ! $bootMode; then
   cp $tmpModPath/core.sh /tmp/
-  mv $tmpModPath/adk /sbin/
-  set_perm /sbin/adk 0 0 755
-  set_perm /tmp/core.sh 0 0 755
+  mv $tmpModPath/$modID /sbin/
+  for f in /sbin/$modID /tmp/core.sh; do
+    set_perm $f 0 0 755
+  done
 fi
-$bootMode && rm $tmpModPath/adk
+$bootMode && rm $tmpModPath/$modID
 
 # auto-mount
 touch $tmpModPath/auto_mount
@@ -290,20 +293,21 @@ ui_print " "
 # module-specific code
 ##########################################################################################
 
-ui_print "  Facebook Suport Page: https://facebook.com"
+ui_print "  Facebook Support Page: https://facebook.com"
 ui_print "    /VR25-at-xda-developers-258150974794782/"
 ui_print " "
 
 ui_print "  WHAT'S NEW"
-  ui_print "    Fixed install failure from MM (Android P, Magisk v16.7)"
-  ui_print "    Major optimizations for greater efficiency"
-  ui_print "    Simplified code documentation"
-  ui_print "    Updated reference and module description"
-  ui_print "    "
+ui_print "    Auto-move apps' data back to /data/data if adk is disabled/removed"
+ui_print "    \"Exclude all\" mode set by default (check doc. for details)"
+ui_print "    General fixes and optimizations"
+ui_print "    Move post-fs-data.sh to .core/post-fs-data.d for efficiency++"
+ui_print "    Updated debugging tools & documentation"
+ui_print "    "
 
 grep -q '16\.7' /data/adb/magisk/util_functions.sh 2>/dev/null \
   && ui_print "  *Note*: a Magisk 16.7 bug causes $modID to" \
-  && ui_print "    generate empty logs (\"set -x\" doesn't work)" \
+  && ui_print "    generate empty verbose logs (\"set -x\" is broken)" \
   && ui_print " "
 
 ##########################################################################################

@@ -13,8 +13,8 @@ main() {
   functionName=bkp_apps
   modData=/data/media/$modID
   logsDir=$modData/logs
-  newLog=$logsDir/${functionName}_verbose_log.txt
-  oldLog=$logsDir/${functionName}_verbose_previous_log.txt
+  newLog=$logsDir/${functionName}.log
+  oldLog=$logsDir/${functionName}_old.log
 
   # verbose generator
   mkdir -p $logsDir 2>/dev/null

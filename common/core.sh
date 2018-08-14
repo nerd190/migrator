@@ -14,28 +14,29 @@ apksBkp=$modData/apksBkp
 # read installed apks (in post-fs-data mode)
 # treat updated system apps as user apps
 main() {
-  grep 'package name' /data/system/packages.xml | \
-  awk '{print $2,$3}' | sed 's:"::g; s:name=::; s:codePath=::' | \
-  while read line; do
-    if echo "$line" | grep -q '/system/' \
-      && ! [ -f /data/app/$(pkg_name)\-1/base.apk -o -f /data/app/$(pkg_name)\-2/base.apk ]
-    then
-      if grep -q "^inc $(pkg_name)" $config 2>/dev/null; then
-        (mv_bindm) &
-      else
-        (restore_exc) &
-      fi
-    else
-      if ! grep -q "^exc $(pkg_name)" $config 2>/dev/null \
-        || { grep -q '^exc$' $config \
-          && grep -q "^inc $(pkg_name)" $config; } 2>/dev/null
+  if grep -v '^#' $config 2>dev/null | grep -q '[a-z]' || [ -n "$(ls "$appData" 2>/dev/null)" ]; then
+    grep 'package name' /data/system/packages.xml | \
+    awk '{print $2,$3}' | sed 's:"::g; s:name=::; s:codePath=::' | \
+    while read line; do
+      if echo "$line" | grep -q '/system/' \
+        && ! [ -f /data/app/$(pkg_name)\-1/base.apk -o -f /data/app/$(pkg_name)\-2/base.apk ]
       then
-        (mv_bindm) &
+        if grep -q "^inc $(pkg_name)" $config 2>/dev/null; then
+          (mv_bindm) &
+        else
+          (restore_exc) &
+        fi
       else
-        (restore_exc) &
+        if grep -Eq "^inc $(pkg_name)|^inc$" $config 2>/dev/null \
+          && ! grep -q "^exc $(pkg_name)" $config 2>/dev/null
+        then
+          (mv_bindm) &
+        else
+          (restore_exc) &
+        fi
       fi
-    fi
-  done
+    done
+  fi
 }
 
 
@@ -73,7 +74,8 @@ movef() {
     wait
   else
     # move app data to $appData
-    rm -rf $appData/$1 2>/dev/null
+    { mkdir -p $appData
+    rm -rf $appData/$1; } 2>/dev/null
     mv /data/data/$1 $appData/
   fi
 }
