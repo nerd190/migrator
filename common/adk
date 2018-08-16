@@ -4,7 +4,10 @@
 # License: GPL v3+
 
 
+setenforce 0
 set -u
+
+getprop | grep zygote | grep -q running && { echo -e "\n(!) Not in recovery mode\n"; exit 1; } 
 
 is_mounted() { mountpoint -q "$1"; }
 
@@ -14,18 +17,13 @@ mount_image() {
     mount -o remount,rw /
     mkdir -p "$2"
   fi
-  if (! is_mounted $2); then
-    loopDevice=
-    for LOOP in 0 1 2 3 4 5 6 7; do
+  if ! is_mounted $2; then
+    for n in 0 1 2 3 4 5 6 7; do
       if (! is_mounted $2); then
-        loopDevice=/dev/block/loop$LOOP
-        [ -f "$loopDevice" ] || mknod $loopDevice b 7 $LOOP 2>/dev/null
+        loopDevice=/dev/block/loop$n
+        [ -b "$loopDevice" ] || mknod $loopDevice b 7 $n 2>/dev/null
         losetup $loopDevice $1
-        if [ "$?" -eq "0" ]; then
-          mount -t ext4 -o loop $loopDevice $2
-          is_mounted $2 || /system/bin/toolbox mount -t ext4 -o loop $loopDevice $2
-          is_mounted $2 || /system/bin/toybox mount -t ext4 -o loop $loopDevice $2
-        fi
+        [ "$?" -eq "0" ] && mount -t ext4 -o loop $loopDevice $2
         is_mounted $2 && break
       fi
     done
@@ -49,11 +47,25 @@ fi
 
 mount_image $IMG $mountPoint
 
-. /tmp/core.sh
-restore_data
+echo
+echo -n "\nRevert all changes and uninstall adk (y/N)? "
+read ANS
+
+if echo "$ANS" | grep -iq y; then
+  echo -e "\nPlease wait...\n"
+  for line in $(ls $appData 2>/dev/null); do
+    if [ -n "$line" ]; then
+      (rm -rf "/data/data/$line" 2>/dev/null
+      mv "$appData/$line" /data/data/) &
+    fi
+  done
+  wait
+  mv -f $modData/config.txt /sdcard/adk_config_bkp.txt 2>/dev/null
+  rm -rf $mountPoint/adk $modData
+fi
 
 umount $mountPoint
 losetup -d $loopDevice
 rmdir $mountPoint
-echo -e "- End\n"
+echo -e "- Done.\n"
 exit 0

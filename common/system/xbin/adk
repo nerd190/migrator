@@ -4,14 +4,14 @@
 # License: GPL v3+
 
 
-set -u
-
 modID=adk
-functionName=restore_apps
 modData=/data/media/$modID
 logsDir=$modData/logs
+[ "$1" = "-r" ] && functionName=rm_uninstalled || functionName=restore_apps
 newLog=$logsDir/${functionName}.log
 oldLog=$logsDir/${functionName}_old.log
+
+set -u
 
 # use Magisk's busybox
 [ -d /sbin/.core/busybox ] && PATH=/sbin/.core/busybox:$PATH \
@@ -20,7 +20,7 @@ oldLog=$logsDir/${functionName}_old.log
   # verbose generator
 mkdir -p $logsDir 2>/dev/null
 [ -f "$newLog" ] && mv $newLog $oldLog
-set -x 2>>$newLog
+exec 2>$newLog
 
 # find modPath
 modPath=/sbin/.core/img/$modID
@@ -30,4 +30,5 @@ modPath=/sbin/.core/img/$modID
 
 . $modPath/core.sh
 $functionName
+
 exit 0

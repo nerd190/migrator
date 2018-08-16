@@ -4,6 +4,7 @@
 # License: GPL v3+
 
 
+setenforce 0
 set -u
 
 modID=adk

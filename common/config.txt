@@ -1,0 +1,51 @@
+# App Data Keeper (adk) Config
+
+
+
+# Syntax:
+
+# Include all user and *updated* system packages data
+#inc
+
+# Include pkgName (user or any system package data)
+#inc pkgName
+
+# Exclude *user* pkgName data (overrides "inc" and "inc pkgName")
+#exc pkgName
+
+# Exclude all (default)
+#NOTHING (null/empty config)
+
+
+
+# Example 1 -- all user and *updated* system packages data, except Spotify's:
+
+#inc
+#exc com.spotify music
+
+
+
+# Example 2 -- only Android Keyboard (AOSP) data
+
+# A non-update-able system app
+#inc com.android.inputmethod.latin
+
+
+
+# Example 3 -- Android Keyboard (AOSP) and all user & *updated* system packages data, except Spotify's:
+
+#inc
+
+# Non-update-able system apps are not affected by a bare "inc"
+#inc com.android.inputmethod.latin
+
+#exc com.spotify music
+
+
+
+# Example 4: all user and *updated* system packages data, except *updated* Google Play Services:
+
+#inc
+
+# Updated system packages are treated as user apps -- affected by a bare "inc"
+#exc com.google.android.gms

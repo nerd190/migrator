@@ -207,6 +207,7 @@ mount_image $IMG $mountPath
 ##########################################################################################
 
 modData=/data/media/$modID
+config=$modData/config.txt
 modInfo=$modData/info
 postFsD="$(echo $modPath | sed "s/$modID//").core/post-fs-data.d"
 
@@ -239,18 +240,17 @@ set_perm "$postFsD/${modID}.sh" 0 0 755
   && mv $tmpModPath/system/xbin $tmpModPath/system/bin
 mv -f License.md README.md $modInfo/
 
-# recovery rollback helper
-if ! $bootMode; then
-  cp $tmpModPath/core.sh /tmp/
-  mv $tmpModPath/$modID /sbin/
-  for f in /sbin/$modID /tmp/core.sh; do
-    set_perm $f 0 0 755
-  done
-fi
-$bootMode && rm $tmpModPath/$modID
+# uninstaller
+mv -f $tmpModPath/$modID $modData/rollback
+set_perm $modData/rollback 0 0 755
+$bootMode || ls -s $modData/rollback /sbin/
 
 # auto-mount
 touch $tmpModPath/auto_mount
+
+# default config
+[ -e "$config" ] && rm $tmpModPath/config.txt \
+  || mv $tmpModPath/config.txt $config
 
 ##########################################################################################
 
@@ -298,11 +298,15 @@ ui_print "    /VR25-at-xda-developers-258150974794782/"
 ui_print " "
 
 ui_print "  WHAT'S NEW"
-ui_print "    Auto-move apps' data back to /data/data if adk is disabled/removed"
-ui_print "    \"Exclude all\" mode set by default (check doc. for details)"
-ui_print "    General fixes and optimizations"
-ui_print "    Move post-fs-data.sh to .core/post-fs-data.d for efficiency++"
-ui_print "    Updated debugging tools & documentation"
+ui_print "    adk -r removes all uninstalled APK's from backup folder"
+ui_print "    cp uninstaller (rollback) to /data/media/adk"
+ui_print "    Default config.txt includes a set up tutorial"
+ui_print "    Fixed \"duplicate/orphan APK's in backup folder\""
+ui_print "    Misc optimizations"
+ui_print "    More advanced and user-friendly APK restore wizard"
+ui_print "    New and blazing fast batch APK restore algorithm"
+ui_print "    Set SELinux mode to \"permissive\" (compatibility)"
+ui_print "    Updated documentation (please [re]read it)"
 ui_print "    "
 
 grep -q '16\.7' /data/adb/magisk/util_functions.sh 2>/dev/null \

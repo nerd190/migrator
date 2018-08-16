@@ -1,7 +1,7 @@
 id=adk
 name=App Data Keeper
-version=2018.8.15
-versionCode=201808150
+version=2018.8.16
+versionCode=201808160
 author=VR25 @ xda-developers
-description=Make apps' data survive the standard TWRP factory reset. Auto-backup installed APK's. Batch reinstall APK's with ease after factory resets. If the module is disabled or removed, changes are automatically reverted. Read the documentation and license before installing/updating.
+description=Make apps' data survive the standard TWRP wipe (factory reset). Auto-backup installed APK's. Batch restore APK's easily and fast after factory resets. Bonus: TWRP will boot much faster. If the module is disabled or removed, changes are automatically reverted. Read the documentation and license before installing/updating.
 minMagisk=1500
