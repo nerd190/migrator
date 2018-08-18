@@ -217,7 +217,7 @@ case "$(uname -m)" in
   *ar*) binArch=arm;;
 esac
 
-# cleanup obsolete data
+# remove obsolete data
 [ "$(grep_prop versionCode $modPath/module.prop)" -lt "201807300" ] \
   && rm $modInfo/Change* 2>/dev/null
 
@@ -243,7 +243,7 @@ mv -f License.md README.md $modInfo/
 # uninstaller
 mv -f $tmpModPath/$modID $modData/rollback
 set_perm $modData/rollback 0 0 755
-$bootMode || ls -s $modData/rollback /sbin/
+$bootMode || ln -s $modData/rollback /sbin/adk
 
 # auto-mount
 touch $tmpModPath/auto_mount
@@ -298,15 +298,11 @@ ui_print "    /VR25-at-xda-developers-258150974794782/"
 ui_print " "
 
 ui_print "  WHAT'S NEW"
-ui_print "    adk -r removes all uninstalled APK's from backup folder"
-ui_print "    cp uninstaller (rollback) to /data/media/adk"
-ui_print "    Default config.txt includes a set up tutorial"
-ui_print "    Fixed \"duplicate/orphan APK's in backup folder\""
-ui_print "    Misc optimizations"
-ui_print "    More advanced and user-friendly APK restore wizard"
-ui_print "    New and blazing fast batch APK restore algorithm"
-ui_print "    Set SELinux mode to \"permissive\" (compatibility)"
-ui_print "    Updated documentation (please [re]read it)"
+ui_print "    Auto-update app data ownership (compatibility)"
+ui_print "    Enhanced module uninstaller, parallel processing and APK restorer"
+ui_print "    Major optimizations"
+ui_print "    Updated documentation (as always, read it!)"
+ui_print "    Parse \"package.list\" instead of \"packages.xml\" (efficiency)"
 ui_print "    "
 
 grep -q '16\.7' /data/adb/magisk/util_functions.sh 2>/dev/null \

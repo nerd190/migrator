@@ -5,6 +5,7 @@
 
 
 setenforce 0
+umask 000
 set -u
 
 modID=adk
@@ -15,17 +16,30 @@ functionName=main
 logsDir=$modData/logs
 newLog=$logsDir/${functionName}.log
 oldLog=$logsDir/${functionName}_old.log
+pkgList=/data/system/packages.list
+
 
 modPath=/sbin/.core/img/$modID
 [ -f $modPath/module.prop ] || modPath=/magisk/$modID
 
+
+pkg_name() { echo $LINE | awk '{print $1}'; }
+data_owner() { echo $LINE | awk '{print $2}'; }
+
+
 restore_data() {
-  for line in $(ls $appData); do
-    (rm -rf "/data/data/$line" 2>/dev/null
-    mv "$appData/$line" /data/data/) &
-  done
-  wait
-  rmdir $appData
+  if [ -n "$(ls "$appData" 2>/dev/null)" ]; then # if $appData is not empty
+    awk '{print $1,$2}' $pkgList | \
+      while read line; do # while read pkg_name and ownership
+        (LINE=$line
+        if [ -n "$(ls "$appData/$(pkg_name)")" ]; then
+          rm -rf "/data/data/$(pkg_name)"
+          mv "$appData/$(pkg_name)" /data/data/
+          chown -R "$(data_owner):$(data_owner)" "/data/data/$(pkg_name)"
+        fi 2>/dev/null) &
+      done
+    wait # for background jobs to finish
+  fi
 }
 
 # verbose generator
@@ -37,7 +51,7 @@ set -x 2>>$newLog
 if [ ! -f $modPath/module.prop ]; then
   restore_data
   mv -f $newLog /sdcard/$modID.log
-  { mv -f $config /sdcard/${modID}_config_bkp.log
+  { mv -f $config /sdcard/${modID}_config_bkp.txt
   rm -rf $modData; } 2>/dev/null
   rm $0
   exit 0
@@ -51,5 +65,4 @@ fi
 
 . $modPath/core.sh
 $functionName
-wait
 exit 0

@@ -12,15 +12,16 @@ newLog=$logsDir/${functionName}.log
 oldLog=$logsDir/${functionName}_old.log
 
 set -u
+umask 000
 
 # use Magisk's busybox
 [ -d /sbin/.core/busybox ] && PATH=/sbin/.core/busybox:$PATH \
   || PATH=/dev/magisk/bin:$PATH
 
-  # verbose generator
+# verbose generator
 mkdir -p $logsDir 2>/dev/null
 [ -f "$newLog" ] && mv $newLog $oldLog
-exec 2>$newLog
+set -x 2>>$newLog
 
 # find modPath
 modPath=/sbin/.core/img/$modID

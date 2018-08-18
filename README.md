@@ -14,7 +14,7 @@
 
 #### DESCRIPTION
 
-- At the time of this writing, by default, a standard TWRP wipe (factory reset) obliterates everything in /data/data, except media, misc/vold and system/storage.xml. This can be frustrating for many, as it implies having to set things up entirely from scratch after flashing new ROM's and/or advanced mods/tweaks. I don't know of anyone who likes doing such a repetitive and tiring task, nor do I believe that kind of person even exists. Well, unless they have hardcore OCD. Still, I think even such an individual would be frustrated to death at some point (jokes aside). Speaking of repetition and tiredness, Titanium Backup and alike are slow solutions when compared to adk. Besides app data being already in place, adk uses rsync to backup APK's. If you don't know how powerful rsync is, look that up. Last, but not least, the module ships with a terminal tool (`adk`) to batch restore APK's easily and fast after factory resets
+- At the time of this writing, by default, a standard TWRP wipe (factory reset) obliterates everything in /data/data, except media, misc/vold and system/storage.xml. This can be frustrating for many, as it implies having to set things up entirely from scratch after flashing new ROM's and/or advanced mods/tweaks. I don't know of anyone who likes doing such a repetitive and tiring task, nor do I believe that kind of person even exists. Well, unless they have hardcore OCD. Still, I think even such an individual would be frustrated to death at some point (jokes aside). Speaking of repetition and tiredness, Titanium Backup and alike are slow solutions when compared to adk. Besides app data being already in place, adk uses rsync to backup APK's and restoring these is just as fast. If you don't know how powerful rsync is, look that up. Last, but not least, the module ships with a terminal tool (`adk`) to batch restore APK's easily and fast after factory resets
 - Apps' data is moved to /data/media/adk/.appData, then bind-mounted to the original locations. This is done in early post-fs-data mode for maximum efficiency. If somehow, a target APK is missing on the next boot, then the bind-mounting of its data does not occur. This prevents system from removing it.
 - In late start service mode, APKs's are automatically sync'ed to `$(ls -1d /mnt/media_rw/* | head -n1)/adk/apksBkp` (external storage) if found (or else, to `/data/media/adk/apksBkp`). Thanks to rsync's delta algorithm, only changed parts of APK's are copied. Talk about efficiency...
 - Bonus: TWRP will boot much faster.
@@ -76,11 +76,11 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 
 #### SETUP STEPS
 
-*Note*: keep backing up your user and updated system apps' data until you feel comfortable using adk.
+*WARNING*: this module is not a backup solution (yet). Its purpose is making your life easier by not having to restore user and updated system apps' data after factory resets. It "duplicates" time and APK's, NOT apps' data. Keep backing up your user and updated system apps' data at least until you feel comfortable using adk. Good backup is not a single backup. If you take backups seriously, then you have multiple copies of your data in different locations. If something goes wrong, either because "reasons" or you forgot to feed your cat beforehand, AND you don't have a backup, do NOT curse me!
 
 - First Time
 1. Install adk from Magisk Manager or TWRP.
-2. Set up config.txt (if this is skipped, all adk will do is blackup APK's)
+2. Set up config.txt (if this is skipped, all adk will do is backup APK's)
 3. Reboot
 3. 1. *Reboot again if you find any issue*
 4. Forget.
@@ -89,7 +89,7 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 1. Install adk from Magisk Manager or TWRP.
 2. Reboot.
 3. Locate your favorite backed up terminal app in `[external storage]/adk/apksBkp` or `/data/media/adk/apksBkp` and install it.
-4. Run the command `adk`, type `.` (a dot), press the enter key and wait. This will automatically restore all backed up APK's. Alternatively, you can restore one by one or a few at a time (pattern examples: single: `s.*fy`, multiple: `duk|whats|faceb`. Note: patterns shall not be quoted.
+4. Run the command `adk`, type `.` (a dot), press the enter key and wait. This will automatically restore all backed up APK's. Alternatively, you can restore one by one or a few at a time (pattern examples: single: `s.*fy`, multiple: `duk|whats|faceb`. Note: patterns shall not be quoted not contain spaces.
 5. Reboot.
 5.1. *Reboot again if you find any issue*
 6. Forget.
@@ -119,6 +119,13 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 
 #### LATEST CHANGES
 
+**2018.8.18 (201808180)**
+- Auto-update app data ownership (compatibility)
+- Enhanced module uninstaller, parallel processing and APK restorer
+- Major optimizations
+- Updated documentation (as always, read it!)
+- Parse `package.list` instead of `packages.xml` (efficiency)
+
 **2018.8.16 (201808160)**
 - Added option to remove all uninstalled APK's from backup folder (`adk -r`)
 - cp uninstaller (rollback) to /data/media/adk
@@ -136,9 +143,3 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 - General fixes and optimizations
 - Move post-fs-data.sh to .core/post-fs-data.d for efficiency++"
 - Updated debugging tools & documentation
-
-**2018.8.14 (201808140)**
-- Fixed install failure from MM (Android P, Magisk 16.7)
-- Major optimizations for greater efficiency
-- Simplified code documentation
-- Updated reference and module description

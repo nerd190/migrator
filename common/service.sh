@@ -7,6 +7,7 @@
 main() {
 
   set -u
+  umask 000
 
   modID=adk
   modPath=${0%/*}
@@ -22,7 +23,9 @@ main() {
   set -x 2>>$newLog
 
   . $modPath/core.sh
-  $functionName
+  ($functionName) &
+  pending_apps
+  wait
   exit 0
 }
 

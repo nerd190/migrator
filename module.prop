@@ -1,7 +1,8 @@
 id=adk
 name=App Data Keeper
-version=2018.8.16
-versionCode=201808160
+version=2018.8.18
+versionCode=201808180
 author=VR25 @ xda-developers
-description=Make apps' data survive the standard TWRP wipe (factory reset). Auto-backup installed APK's. Batch restore APK's easily and fast after factory resets. Bonus: TWRP will boot much faster. If the module is disabled or removed, changes are automatically reverted. Read the documentation and license before installing/updating.
+description=Make apps' data survive the standard TWRP wipe (factory reset). Auto-backup installed APK's. Batch restore APK's easily and fast after factory resets. Bonus: TWRP will boot much faster. If the module is disabled or removed, changes are automatically reverted. Read the documentation and license before installing/updating. *WARNING*: this module is not a backup solution (yet). Its purpose is making your life easier by not having to restore user and updated system apps data after factory resets. It "duplicates" time and APK's, NOT apps' data. Keep backing up your user and updated system apps' data at least until you feel comfortable using adk. Good backup is not a single backup. If you take backups seriously, then you have multiple copies of your data in different locations. If something goes wrong, either because "reasons" or you forgot to feed your cat beforehand, AND you don't have a backup, do NOT curse me!
+
 minMagisk=1500

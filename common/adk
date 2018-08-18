@@ -4,68 +4,93 @@
 # License: GPL v3+
 
 
-setenforce 0
+getprop | grep zygote | grep -q running && { echo -e "\n(!) Not in recovery mode\n"; exit 1; }
+
+mount /data 2>/dev/null
+[ -d /data/adb/magisk ] && IMG=/data/adb/magisk.img \
+  || IMG=/data/magisk.img
+
+echo
+echo -n "Revert all changes and uninstall adk (y/N)? "
+read ANS
+
+
+echo "$ANS" | grep -iq y || { echo; exit 0; }
+
+echo
+echo -n "Please wait..."
+
 set -u
+umask 000
+setenforce 0
 
-getprop | grep zygote | grep -q running && { echo -e "\n(!) Not in recovery mode\n"; exit 1; } 
+modID=adk
+loopDevice=NULL
+mountPoint=/magisk
+modData=/data/media/$modID
+appData=$modData/.appData
+pkgList=/data/system/packages.list
 
-is_mounted() { mountpoint -q "$1"; }
+pkg_name() { echo $LINE | awk '{print $1}'; }
+data_owner() { echo $LINE | awk '{print $2}'; }
+is_mounted() { mountpoint -q "$1" 2>/dev/null; }
 
-mount_image() {
+echo_notice() {
+  echo "- Main adk features were successfully disabled"
+  echo -e "- Remove the module manually\n"
+}
+
+
+if [ -n "$(ls "$appData" 2>/dev/null)" ]; then # if $appData is not empty
+  awk '{print $1,$2}' $pkgList | \
+    while read line; do # while read pkg_name and ownership
+      (LINE="$line"
+      if [ -n "$(ls "$appData/$(pkg_name)")" ]; then
+        rm -rf "/data/data/$(pkg_name)"
+        mv "$appData/$(pkg_name)" /data/data/
+        chown -R "$(data_owner):$(data_owner)" "/data/data/$(pkg_name)"
+      fi 2>/dev/null) &
+    done
+  wait
+fi
+
+mv -f $modData/config.txt /sdcard/adk_config_bkp.txt 2>/dev/null
+rm -rf $modData
+
+if ! [ -d /data/adb/magisk -o -d /data/magisk ]; then
+  echo -e "\n\n(!) No Magisk installation found or installed version is not supported"
+  echo_notice
+
+else
   e2fsck -fy $IMG &>/dev/null
-  if [ ! -d "$2" ]; then
+  if [ ! -d "$mountPoint" ]; then
     mount -o remount,rw /
-    mkdir -p "$2"
+    mkdir -p $mountPoint
   fi
-  if ! is_mounted $2; then
+
+  if ! is_mounted $mountPoint; then
     for n in 0 1 2 3 4 5 6 7; do
-      if (! is_mounted $2); then
+      if ! is_mounted $mountPoint; then
         loopDevice=/dev/block/loop$n
         [ -b "$loopDevice" ] || mknod $loopDevice b 7 $n 2>/dev/null
-        losetup $loopDevice $1
-        [ "$?" -eq "0" ] && mount -t ext4 -o loop $loopDevice $2
-        is_mounted $2 && break
+        losetup $loopDevice $IMG
+        [ "$?" -eq "0" ] && mount -t ext4 -o loop $loopDevice $mountPoint
+        is_mounted $mountPoint && break
       fi
     done
   fi
+
   if ! is_mounted $mountPoint; then
-    echo -e "\n(!) Failed to mount $IMG\n"
-    exit 1
+    echo "\n\n(!) Failed to mount $IMG"
+    echo_notice
+  else
+    rm -rf $mountPoint/adk
+    umount $mountPoint
+    losetup -d $loopDevice
+    rmdir $mountPoint
+    echo -e "\n\n- Done\n"
   fi
-}
-
-mountPoint=/magisk
-
-mount /data 2>/dev/null
-
-[ -d /data/adb/magisk ] && IMG=/data/adb/magisk.img || IMG=/data/magisk.img
-
-if [ ! -d /data/adb/magisk ] && [ ! -d /data/magisk ]; then
-  echo -e "\n(!) No Magisk installation found or installed version is not supported\n"
-  exit 1
 fi
 
-mount_image $IMG $mountPoint
-
-echo
-echo -n "\nRevert all changes and uninstall adk (y/N)? "
-read ANS
-
-if echo "$ANS" | grep -iq y; then
-  echo -e "\nPlease wait...\n"
-  for line in $(ls $appData 2>/dev/null); do
-    if [ -n "$line" ]; then
-      (rm -rf "/data/data/$line" 2>/dev/null
-      mv "$appData/$line" /data/data/) &
-    fi
-  done
-  wait
-  mv -f $modData/config.txt /sdcard/adk_config_bkp.txt 2>/dev/null
-  rm -rf $mountPoint/adk $modData
-fi
-
-umount $mountPoint
-losetup -d $loopDevice
-rmdir $mountPoint
-echo -e "- Done.\n"
+echo -e "(i) Ignore \"no such file or directory\" errors\n"
 exit 0
