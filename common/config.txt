@@ -1,51 +1,93 @@
-# App Data Keeper (adk) Config
+App Data Keeper (adk) Config
+/data/media/adk/config.txt
 
 
+SYNTAX
 
-# Syntax:
+  Incremental apps' data backup frequency in hours (value must be an integer, default: 8)
+  
+      bkpFreq=8
 
-# Include all user and *updated* system packages data
-#inc
+  Include all user and *updated* system apps
+      inc
 
-# Include pkgName (user or any system package data)
-#inc pkgName
+  Include pkgName (this works for any app, and it's the only way to *include non-update-able system apps*)
+  
+      inc pkgName
 
-# Exclude *user* pkgName data (overrides "inc" and "inc pkgName")
-#exc pkgName
+  Exclude *user* app (overrides "inc" and "inc pkgName")
+  
+      exc pkgName
 
-# Exclude all (default)
-#NOTHING (null/empty config)
-
-
-
-# Example 1 -- all user and *updated* system packages data, except Spotify's:
-
-#inc
-#exc com.spotify music
-
-
-
-# Example 2 -- only Android Keyboard (AOSP) data
-
-# A non-update-able system app
-#inc com.android.inputmethod.latin
+  Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
+  
+      bkp [extra rsync option(s)] [SOURCE(s)] [DEST]
+    
+    Tip: use $i for internal storage and $e for external media (largest partition) as opposed to writing full paths.
+    
+    For rsync-specific details, refer to its man page.
 
 
+EXAMPLES
 
-# Example 3 -- Android Keyboard (AOSP) and all user & *updated* system packages data, except Spotify's:
+  App data protection setups
 
-#inc
+    All user and *updated* system apps, except Spotify
+    
+      inc
+      
+      exc com.spotify music
 
-# Non-update-able system apps are not affected by a bare "inc"
-#inc com.android.inputmethod.latin
+    Only Android Keyboard (AOSP) (a non-update-able system app)
+    
+      inc com.android.inputmethod.latin
 
-#exc com.spotify music
+    Android Keyboard (AOSP) and all user & *updated* system apps, except Spotify
+    
+      inc
+      
+      inc com.android.inputmethod.
+      
+      exc com.spotify music
+
+    All user and *updated* system apps, except *updated* Google Play Services
+    
+      inc
+      
+      exc com.google.android.gms
+
+  Backup setups
+  
+    Full internal storage
+    
+      bkp --del $i/ $e/full_internal_bkp
+    
+    Specific data
+    
+      bkp --del $i/Download $i/Dukto $e/important_data
+    
+    Some data to some remote machine
+    
+      bkp -e "ssh -i /path/to/key" SOURCE user@host:DESTINATION
+    
+    Sync all backed up apps and respective data to a remote machine
+
+      bkp -e "ssh -i /path/to/key" $appBkps $appdataBkps user@host:DESTINATION
+    
+    
+NOTES
+
+  A bare "inc" affects user and updated system apps only.
+  
+  An empty/null config disables all features. If data protection was enabled, app data is automatically moved back to /data/data on the next boot. Data is also automatically restored the next boot after adk is disabled/uninstalled.
+
+  Only inc'd (included) apps are backed up.
+
+  Updated system apps are treated as user apps.
+
+  Valid config lines have no leading nor trailing pounds/spaces and/or any other additionall characters.
 
 
+DEFAULT CONFIG
 
-# Example 4: all user and *updated* system packages data, except *updated* Google Play Services:
-
-#inc
-
-# Updated system packages are treated as user apps -- affected by a bare "inc"
-#exc com.google.android.gms
+inc

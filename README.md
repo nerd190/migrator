@@ -4,111 +4,183 @@
 
 
 
+---
 #### DISCLAIMER
 
-- This software is provided as is, in the hope that it will be useful, but without any warranty. Always read the reference prior to installing/updating. While no cats have been harmed, I assume no responsibility under anything that might go wrong due to the use/misuse of it.
-- A copy of the GNU General Public License, version 3 or newer ships with every build. Please, read it prior to using, modifying and/or sharing any part of this work.
-- To prevent fraud, DO NOT mirror any link associated with this project.
+This software is provided as is, in the hope that it will be useful, but without any warranty. Always read the reference prior to installing/updating. While no cats have been harmed, I assume no responsibility under anything that might go wrong due to the use/misuse of it.
+
+A copy of the GNU General Public License, version 3 or newer ships with every build. Please, read it prior to using, modifying and/or sharing any part of this work.
+
+To prevent fraud, DO NOT mirror any link associated with this project.
 
 
 
+---
 #### DESCRIPTION
 
-- At the time of this writing, by default, a standard TWRP wipe (factory reset) obliterates everything in /data/data, except media, misc/vold and system/storage.xml. This can be frustrating for many, as it implies having to set things up entirely from scratch after flashing new ROM's and/or advanced mods/tweaks. I don't know of anyone who likes doing such a repetitive and tiring task, nor do I believe that kind of person even exists. Well, unless they have hardcore OCD. Still, I think even such an individual would be frustrated to death at some point (jokes aside). Speaking of repetition and tiredness, Titanium Backup and alike are slow solutions when compared to adk. Besides app data being already in place, adk uses rsync to backup APK's and restoring these is just as fast. If you don't know how powerful rsync is, look that up. Last, but not least, the module ships with a terminal tool (`adk`) to batch restore APK's easily and fast after factory resets
-- Apps' data is moved to /data/media/adk/.appData, then bind-mounted to the original locations. This is done in early post-fs-data mode for maximum efficiency. If somehow, a target APK is missing on the next boot, then the bind-mounting of its data does not occur. This prevents system from removing it.
-- In late start service mode, APKs's are automatically sync'ed to `$(ls -1d /mnt/media_rw/* | head -n1)/adk/apksBkp` (external storage) if found (or else, to `/data/media/adk/apksBkp`). Thanks to rsync's delta algorithm, only changed parts of APK's are copied. Talk about efficiency...
-- Bonus: TWRP will boot much faster.
+At the time of this writing, by default, a standard TWRP wipe (factory reset) obliterates everything in /data/data, except media, misc/vold and system/storage.xml.
+
+This module protects select apps' data from being wiped out. Thus, greatly reducing the amount of time required for setting up a new system.
+
+Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities. Protected data and respective APK's are automatically backed up.
+
+Bonus: TWRP boot time and backup sizes are greatly reduced when a significant amount of app data is protected.
 
 
 
+---
 #### PRE-REQUISITES
 
-- Magisk
-- Terminal emulator app (for restoring APK's)
+- Magisk v15+
+- Terminal emulator
 
 
 
+---
 #### CONFIG
 
 
 Config file: /data/media/adk/config.txt
 
 
-Syntax:
+SYNTAX
 
-  `inc` --> include all user and *updated* system packages data
+  Incremental apps' data backup frequency in hours (value must be an integer, default: 8)
+  
+      bkpFreq=8
 
-  `inc pkgName` --> include pkgName (user or any system package data)
+  Include all user and *updated* system apps
+      inc
 
-  `exc pkgName` --> exclude *user* pkgName data (overrides "inc" and "inc pkgName")
+  Include pkgName (this works for any app, and it's the only way to *include non-update-able system apps*)
+  
+      inc pkgName
 
-  NOTHING (null/empty config) --> exclude all (default)
+  Exclude *user* app (overrides "inc" and "inc pkgName")
+  
+      exc pkgName
 
-
-Example 1 -- all user and *updated* system packages data, except Spotify's:
-
-    `inc
-
-    exc com.spotify music`
-
-
-Example 2 -- only Android Keyboard (AOSP) data
-
-    `inc com.android.inputmethod.latin` (non-update-able system app)
-
-
-Example 3 -- Android Keyboard (AOSP) and all user & *updated* system packages data, except Spotify's:
-
-    `inc`
-
-    `inc com.android.inputmethod.latin` (non-update-able system apps are not affected by a bare "inc")
-
-    `exc com.spotify music`
+  Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
+  
+      bkp [extra rsync option(s)] [SOURCE(s)] [DEST]
+    
+    Tip: use $i for internal storage and $e for external media (largest partition) as opposed to writing full paths.
+    
+    For rsync-specific details, refer to its man page.
 
 
-Example 4: all user and *updated* system packages data, except *updated* Google Play Services:
+EXAMPLES
 
-    `inc`
+  App data protection setups
 
-    `exc com.google.android.gms` (updated system packages are treated as user apps -- affected by a bare "inc")
+    All user and *updated* system apps, except Spotify
+    
+      inc
+      
+      exc com.spotify music
+
+    Only Android Keyboard (AOSP) (a non-update-able system app)
+    
+      inc com.android.inputmethod.latin
+
+    Android Keyboard (AOSP) and all user & *updated* system apps, except Spotify
+    
+      inc
+      
+      inc com.android.inputmethod.
+      
+      exc com.spotify music
+
+    All user and *updated* system apps, except *updated* Google Play Services
+    
+      inc
+      
+      exc com.google.android.gms
+
+  Backup setups
+  
+    Full internal storage
+    
+      bkp --del $i/ $e/full_internal_bkp
+    
+    Specific data
+    
+      bkp --del $i/Download $i/Dukto $e/important_data
+    
+    Some data to some remote machine
+    
+      bkp -e "ssh -i /path/to/key" SOURCE user@host:DESTINATION
+    
+    Sync all backed up apps and respective data to a remote machine
+
+      bkp -e "ssh -i /path/to/key" $appBkps $appdataBkps user@host:DESTINATION
+
+    
+NOTES
+
+  A bare "inc" affects user and updated system apps only.
+  
+  An empty/null config disables all features. If data protection was enabled, app data is automatically moved back to /data/data on the next boot. Data is also automatically restored the next boot after adk is disabled/uninstalled.
+
+  Only inc'd (included) apps are backed up.
+
+  Updated system apps are treated as user apps.
+
+  Valid config lines have no leading nor trailing pounds/spaces and/or any other additionall characters.
+
+
+DEFAULT CONFIG
+
+  inc
+  
+
+
+---
+#### TERMINAL
+
+Running `adk` as root launches "adk wizard". Included options are incremental backups, data restore, and more.
 
 
 
+---
 #### SETUP STEPS
 
-*WARNING*: this module is not a backup solution (yet). Its purpose is making your life easier by not having to restore user and updated system apps' data after factory resets. It "duplicates" time and APK's, NOT apps' data. Keep backing up your user and updated system apps' data at least until you feel comfortable using adk. Good backup is not a single backup. If you take backups seriously, then you have multiple copies of your data in different locations. If something goes wrong, either because "reasons" or you forgot to feed your cat beforehand, AND you don't have a backup, do NOT curse me!
+**WARNING**: make sure you have recent backups of your apps' data before enabling adk's app data protection feature. Good backup is not a single backup. If you take backups seriously, then you have multiple copies of your data in different locations. If something goes wrong, either because "reasons" or you forgot to feed your cat beforehand, AND you don't have a backup, do NOT curse me! Also, NEVER "downgrade" directly; uninstall and reboot first.
 
 - First Time
 1. Install adk from Magisk Manager or TWRP.
-2. Set up config.txt (if this is skipped, all adk will do is backup APK's)
-3. Reboot
-3. 1. *Reboot again if you find any issue*
+2. Customize your config.txt (optional)
+3. Reboot. *Reboot again if you find any issue*.
 4. Forget.
 
 - After a Factory Reset
 1. Install adk from Magisk Manager or TWRP.
 2. Reboot.
-3. Locate your favorite backed up terminal app in `[external storage]/adk/apksBkp` or `/data/media/adk/apksBkp` and install it.
-4. Run the command `adk`, type `.` (a dot), press the enter key and wait. This will automatically restore all backed up APK's. Alternatively, you can restore one by one or a few at a time (pattern examples: single: `s.*fy`, multiple: `duk|whats|faceb`. Note: patterns shall not be quoted not contain spaces.
-5. Reboot.
-5.1. *Reboot again if you find any issue*
+3. Locate your favorite backed up terminal app in `[external storage]/adk/backups/apk` or `/data/media/adk/backups/apk` and install it.
+4. Run the command `adk` and follow the wizard to restore backed up apps and respective data.
+5. Reboot. *Reboot again if you find any issue*.
 6. Forget.
 
 
 
+---
 #### DEBUGGING & ADVANCED INFO
 
-- logsDir: /data/media/adk/logs
-- SELinux mode is set to "permissive" for compatibility.
-- Updated system apps are treated as user apps.
-- `adk -r` root command removes all uninstalled APK's from backup folder.
-- While in recovery and after flashing the module, the command `adk` is available for *rolling back all changes* and completely uninstalling adk.
-- If you find any issue after installing/updating, *rebooting again* may fix the problem.
-- If the module is disabled or removed, apps' data is automatically moved back to /data/data.
-- Another way to rollback is running `/data/media/adk/rollback` on recovery terminal.
+Apps are disabled before data restore and re-enabled afterwards.
+
+bkpFreq for "bkp [extra rsync option(s)] [SOURCE(s)] [DEST]" is $((bkpFreq + 3600)). That is, one hour after the set value. This prevents conflicts with bkp_appdata().
+
+How does this data protection thing actually work? At a glance, adk moves select apps' data to /data/media/adk/appdata before system services start. Next, it bind-mounts moved folders to their original locations. Thus, apps are fooled into "believing" their data is still in /data/media. Of course, this is an overly simplified explanation. Refer to the source code for extensive info.
+
+logsDir: /data/media/adk/logs
+
+SELinux mode is set to "permissive" for compatibility.
+
+When external storage is detected, adk uses the largest partition for backups.
 
 
 
+---
 #### LINKS
 
 - [Facebook Support Page](https://facebook.com/VR25-at-xda-developers-258150974794782)
@@ -117,7 +189,20 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 
 
 
+---
 #### LATEST CHANGES
+
+**2018.8.28 (201808280)**
+- Protected data and respective APK's are automatically backed up to largest_external_partition/adk/backups (fallback -- /data/media/adk/backups)
+- Removed 'rollback' executable (obsolete)
+- Support for automatic (scheduled) as well as on-demand incremental backups
+- Magisk module template 1500
+- Migrate app data to '/data/media/adk/appdata'
+- More efficient APK backups
+- Restrict app data permissions to 'rwx-rwx-x (771)' 
+- Terminal 'adk' wizard
+- Updated documentation
+- Zillion+ features, fixes and improvements
 
 **2018.8.18 (201808180)**
 - Auto-update app data ownership (compatibility)
@@ -136,10 +221,3 @@ Example 4: all user and *updated* system packages data, except *updated* Google 
 - New and blazing fast batch APK restore algorithm
 - Set SELinux mode to "permissive" for more compatibility
 - Updated documentation (please [re]read it)
-
-**2018.8.15 (201808150)**
-- Auto-move apps' data back to /data/data if adk is disabled/removed
-- "Exclude all" mode set by default (check the README for details)
-- General fixes and optimizations
-- Move post-fs-data.sh to .core/post-fs-data.d for efficiency++"
-- Updated debugging tools & documentation

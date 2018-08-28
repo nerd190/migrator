@@ -4,33 +4,32 @@
 # License: GPL v3+
 
 
-setenforce 0
-umask 000
-set -u
-
-modID=adk
-modData=/data/media/$modID
-config=$modData/config.txt
-appData=$modData/.appData
-functionName=main
+modId=adk
+modData=/data/media/$modId
+Config=$modData/config.txt
+appData=$modData/appdata
+Function=main
 logsDir=$modData/logs
-newLog=$logsDir/${functionName}.log
-oldLog=$logsDir/${functionName}_old.log
+newLog=$logsDir/${Function}.log
+oldLog=$logsDir/${Function}_old.log
 pkgList=/data/system/packages.list
+modPath="$(sed -n 's/^.*MOUNTPATH=//p' /data/adb/magisk/util_functions.sh)/$modId"
 
 
-modPath=/sbin/.core/img/$modID
-[ -f $modPath/module.prop ] || modPath=/magisk/$modID
+set -u # exit on unset or null variable/parameter
+setenforce 0 # sets SELinux mode to "permissive"
+umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
 
 
-pkg_name() { echo $LINE | awk '{print $1}'; }
-data_owner() { echo $LINE | awk '{print $2}'; }
+pkg_name() { echo "$LINE" | awk '{print $1}'; }
+data_owner() { echo "$LINE" | awk '{print $2}'; }
 
 
 restore_data() {
-  if [ -n "$(ls "$appData" 2>/dev/null)" ]; then # if $appData is not empty
+  # if $appData is not empty
+  if [ -n "$(ls "$appData" 2>/dev/null)" ]; then
     awk '{print $1,$2}' $pkgList | \
-      while read line; do # while read pkg_name and ownership
+      while read line; do
         (LINE=$line
         if [ -n "$(ls "$appData/$(pkg_name)")" ]; then
           rm -rf "/data/data/$(pkg_name)"
@@ -42,27 +41,26 @@ restore_data() {
   fi
 }
 
+
 # verbose generator
-mkdir -p $logsDir 2>/dev/null
-[ -f "$newLog" ] && mv $newLog $oldLog
-set -x 2>>$newLog
+if [ ! -f $modPath/disable ]; then
+  mkdir -p $logsDir 2>/dev/null
+  [ -f "$newLog" ] && mv $newLog $oldLog
+  exec &>>$newLog
+  set -x
+fi
 
-# if $modID is not installed, restore data, then cleanup & self-destruct
-if [ ! -f $modPath/module.prop ]; then
+
+# data restore & $0 self-destruction
+if [ -f $modPath/disable ] || [ ! -f $modPath/module.prop ] \
+  || ! grep -q '^inc' $Config 2>/dev/null
+then
   restore_data
-  mv -f $newLog /sdcard/$modID.log
-  { mv -f $config /sdcard/${modID}_config_bkp.txt
-  rm -rf $modData; } 2>/dev/null
-  rm $0
+  [ -f $modPath/module.prop ] || rm $0
   exit 0
 fi
 
-# restore data if $modID is disabled
-if [ -f $modPath/disable ]; then
-  restore_data
-  exit 0
-fi
 
 . $modPath/core.sh
-$functionName
+$Function
 exit 0

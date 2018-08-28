@@ -1,22 +1,22 @@
 #!/system/bin/sh
-# App Data Keeper (adk) APK Restorer
+# App Data Keeper (adk) Terminal Toolkit
 # Copyright (C) 2018, VR25 @ xda-developers
 # License: GPL v3+
 
 
-modID=adk
-modData=/data/media/$modID
+modId=adk
+modData=/data/media/$modId
 logsDir=$modData/logs
-[ "$1" = "-r" ] && functionName=rm_uninstalled || functionName=restore_apps
-newLog=$logsDir/${functionName}.log
-oldLog=$logsDir/${functionName}_old.log
+logName=terminal
+newLog=$logsDir/${logName}.log
+oldLog=$logsDir/${logName}_old.log
 
-set -u
-umask 000
+# prepend Magisk's busybox to PATH
+PATH=/sbin/.core/busybox:$PATH
 
-# use Magisk's busybox
-[ -d /sbin/.core/busybox ] && PATH=/sbin/.core/busybox:$PATH \
-  || PATH=/dev/magisk/bin:$PATH
+set -u # exit on unset or null variable/parameter
+setenforce 0 # sets SELinux mode to "permissive"
+umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
 
 # verbose generator
 mkdir -p $logsDir 2>/dev/null
@@ -24,12 +24,8 @@ mkdir -p $logsDir 2>/dev/null
 set -x 2>>$newLog
 
 # find modPath
-modPath=/sbin/.core/img/$modID
-[[ -f $modPath/module.prop ]] || modPath=/magisk/$modID
-[[ -f $modPath/module.prop ]] \
-  || { echo -e "\n(!) modPath not found\n"; exit 1; }
+modPath="$(sed -n 's/^.*MOUNTPATH=//p' /data/adb/magisk/util_functions.sh)/$modId"
+[ -f $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
 
 . $modPath/core.sh
-$functionName
-
-exit 0
+wizard
