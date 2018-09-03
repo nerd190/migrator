@@ -28,7 +28,7 @@ AUTOMOUNT=true
 PROPFILE=false
 
 # Set to true if you need post-fs-data script
-POSTFSDATA=false
+lateStartSvcDATA=false
 
 # Set to true if you need late_start service script
 LATESTARTSERVICE=false
@@ -42,7 +42,7 @@ LATESTARTSERVICE=false
 print_modname() {
   i() { grep_prop $1 $INSTALLER/module.prop; }
   ui_print " "
-  ui_print "$(i name) ($(i id)) $(i version)"
+  ui_print "$(i name) $(i version)"
   ui_print "$(i author)"
   ui_print " "
 }
@@ -105,6 +105,50 @@ set_permissions() {
 # Make update-binary as clean as possible, try to only do function calls in it.
 
 
+exxit() {
+  unmount_magisk_img
+  $BOOTMODE || recovery_cleanup
+  rm -rf $TMPDIR
+  exit $1
+}
+
+
+factory_reset_or_uninstall() {
+  if [ "$curVer" -eq "$(i versionCode)" ]; then
+    if $BOOTMODE; then
+      touch $MOUNTPATH0/$MODID/remove
+      ui_print " "
+      ui_print "(i) $MODID will be removed at next boot."
+      ui_print " "
+
+    else
+      migrate_data
+
+      # wipe data
+      if grep -q '^wipe' $Config 2>/dev/null; then
+        ui_print "- Wiping /data (exc. obvious files/folders)"
+        cd /data
+        for d in $(ls 2>/dev/null | grep -Ev 'adb|media|misc|system' 2>dev/null); do
+          [ -e "$d" ] && rm -rf /data/$d
+        done
+
+        cd misc
+        for d in $(ls 2>dev/null | grep -v vold); do
+          [ -e "$d" ] && rm -rf /data/misc/$d
+        done
+
+        cd /data/system
+        for d in $(ls 2>dev/null | grep -v storage.xml); do
+          [ -e "$d" ] && rm -rf /data/system/$d
+        done
+      fi
+    fi
+    ui_print " "
+    exxit 0
+  fi
+}
+
+
 find_sdcard() {
   if grep -q '/mnt/media_rw' /proc/mounts; then
     Size=0
@@ -120,22 +164,122 @@ find_sdcard() {
 
 
 install_module() {
+  set_env
+  grep -q '^lite' $Config 2>/dev/null && factory_reset_or_uninstall
 
+  # do not support Magisk 16.7 (bugged)
+  if [ "$MAGISK_VER_CODE" -eq 1671 ]; then
+    # abort installation
+	ui_print " "
+	ui_print "(!) Magisk 16.7 is officially unsupported!"
+	ui_print "- It has some big and scary bugs which love eating several modules' heads."
+    ui_print "- Try a newer Magisk version or downgrade to 15.0-16.6."
+	ui_print " "
+	exxit 1
+  fi
+
+  # clean install
+  if [ "$curVer" -lt 201808280 -a "$curVer" -ne 0 ]; then
+    ui_print " "
+    ui_print "(!) Detected legacy version installed!"
+    ui_print "- Data must be migrated."
+    ui_print "- Uninstall $MODID AND reboot first."
+    ui_print " "
+    if [ "$MAGISK_VER_CODE" -eq 1671 ]; then
+      ui_print "(!) Magisk 16.7 is officially unsupported!"
+      ui_print "- It has some big and scary bugs which love eating several modules' heads."
+      ui_print "- Install a newer Magisk version or downgrade to 15.0-16.6."
+      ui_print " "
+    fi
+    exxit 1
+  fi
+
+  # update config
+  [ "$curVer" -lt 201808280 ] \
+    && cp -f $INSTALLER/common/config.txt $Config
+
+  # remove obsolete files
+  [ "$curVer" -lt 201809030 ] && rm $modData/logs/* $MOUNTPATH0/.core/post-fs-data.d/adk.sh 2>/dev/null
+
+  # create module paths
+  { rm -rf $MODPATH
+  mkdir -p $MODPATH/bin $modInfo "$lateStartSvcD"; } 2>/dev/null
+
+  # extract module files
+  ui_print "- Extracting module files"
+  unzip -o "$ZIP" -d $INSTALLER >&2
+  cd $INSTALLER
+  mv bin/rsync_$binArch $MODPATH/bin/rsync
+  mv common/* $MODPATH/
+  mv -f $MODPATH/${MODID}.sh "$lateStartSvcD/"
+  set +u
+  set_perm "$lateStartSvcD/${MODID}.sh" 0 0 755
+  set -u
+  [ -d /system/xbin ] || mv $MODPATH/system/xbin $MODPATH/system/bin
+  mv -f License.md README.md $modInfo/
+
+  # set default config if config.txt is missing
+  [ -f "$Config" ] && { rm $MODPATH/config.txt || :; } \
+    || mv $MODPATH/config.txt $Config
+
+  set +u
+}
+
+
+migrate_data() {
+  if grep -q '^[a-z]' $Config 2>dev/null; then
+    ui_print "- Migrating app data"
+    awk '{print $1,$2}' $pkgList | \
+      while read Line; do
+        (if ! [ -d "/data/app/$(pkg_name)-1" -o -d "/data/app/$(pkg_name)-2" ]; then
+          # system app
+          grep -q "^inc $(pkg_name)" $Config 2>/dev/null && movef $Line
+        else
+          # treat as user app
+          if grep -Eq "^inc $(pkg_name)|^inc$" $Config 2>/dev/null \
+            && ! grep -q "^exc $(pkg_name)" $Config 2>/dev/null
+          then
+            movef $Line
+          fi
+        fi) &
+      done
+    wait # for background jobs to finish
+  fi
+}
+
+
+# move APK's and respective data to $appData
+# $1=pkg_name
+movef() {
+  mkdir -p $appData
+  rm -rf $appData/$1 # remove obsolete data
+  mv /data/data/$1 $appData/
+  mv /data/app/{$1}*/base.apk $appData/${1}.apk
+} 2>/dev/null
+
+
+pkg_name() { echo "$Line" | awk '{print $1}'; }
+
+
+# set environment
+set_env() {
   set -ux
 
   modData=/data/media/$MODID
   Config=$modData/config.txt
   modInfo=$modData/info
+  magiskDir=$(echo $MAGISKBIN | sed 's:/magisk::')
+  utilFunc=$magiskDir/util_functions.sh
 
   if $BOOTMODE; then
     find_sdcard
-    MOUNTPATH0=/sbin/.core/img
+    MOUNTPATH0=$(sed -n 's/^.*MOUNTPATH=//p' $utilFunc | head -n1)
   else
     sdCard=/external_sd
     MOUNTPATH0=$MOUNTPATH
   fi
 
-  postFsD=$MOUNTPATH0/.core/post-fs-data.d
+  lateStartSvcD=$MOUNTPATH0/.core/service.d
 
   curVer="$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop)"
   set +u
@@ -147,54 +291,6 @@ install_module() {
     *86*) binArch=x86;;
     *ar*) binArch=arm;;
   esac
-
-  # upgrade $modData/*
-  if [ "$curVer" -lt "201808280" ]; then
-    if [ "$curVer" -ne "0" ] && $BOOTMODE && ls "$modData/.appData" 2>/dev/null | grep -q '[a-z]'; then
-      echo -e "\n(!) adk can't migrate data while it's in use."
-      echo "- No changes were made."
-      echo -e "- Upgrade from TWRP.\n"
-      unmount_magisk_img
-      rm -rf $TMPDIR
-      exit 1
-    fi
-    # migrate data
-    ui_print "- Migrating data"
-    { cd "$sdCard/adk" && [ -d apksBkp ] && { mkdir backups || :; } && mv -f apksBkp backups/apk
-     cd $modData && [ -d apksBkp ] && { mkdir backups || :; } && mv -f apksBkp backups/apk
-    mv "$modData/.appData" "$modData/appdata"; } 2>/dev/null
-    if [ "$?" = 0 ]; then
-      for d in "$modData/appdata"/*; do
-        chmod -R 771 "$d" 2>/dev/null
-      done
-    fi
-    cp -f $INSTALLER/common/config.txt $Config
-    { rm -rf $modData/logs
-    rm $modData/.pending $modData/rollback; } 2>/dev/null
-  fi
-
-  # create module paths
-  { rm -rf $MODPATH
-  mkdir -p $MODPATH/bin $modInfo "$postFsD"; } 2>/dev/null
-
-  # extract module files
-  ui_print "- Extracting module files"
-  unzip -o "$ZIP" -d $INSTALLER >&2
-  cd $INSTALLER
-  mv bin/rsync_$binArch $MODPATH/bin/rsync
-  mv common/* $MODPATH/
-  mv -f $MODPATH/${MODID}.sh "$postFsD/"
-  set +u
-  set_perm "$postFsD/${MODID}.sh" 0 0 755
-  set -u
-  [ -d /system/xbin ] || mv $MODPATH/system/xbin $MODPATH/system/bin
-  mv -f License.md README.md $modInfo/
-
-  # default config
-  [ -f "$Config" ] && { rm $MODPATH/config.txt || :; } \
-    || mv $MODPATH/config.txt $Config
-
-  set +u
 }
 
 
@@ -206,16 +302,12 @@ version_info() {
   ui_print "  Facebook Support Page: https://facebook.com/VR25-at-xda-developers-258150974794782/"
   ui_print " "
 
-  whatsNew="- Protected data and respective APK's are automatically backed up to largest_external_partition/adk/backups (fallback -- /data/media/adk/backups)
-- Removed 'rollback' executable (obsolete)
-- Support for automatic (scheduled) as well as on-demand incremental backups
-- Magisk module template 1500
-- Migrate app data to '/data/media/adk/appdata'
-- More efficient APK backups
-- Restrict app data permissions to 'rwx-rwx-x (771)' 
-- Terminal 'adk' wizard
-- Updated documentation
-- Zillion+ features, fixes and improvements"
+  whatsNew="- Improved log engine
+- Misc enhancements
+- Most of 'lite mode' is ready
+- Moved ignitor (adk.sh) from post-fs-data.d to service.d
+- service.sh merged into adk.sh
+- Updated reference"
 
   ui_print "  WHAT'S NEW"
   echo "$whatsNew" | \
@@ -224,7 +316,13 @@ version_info() {
     done
   ui_print "    "
 
-  grep -q '16\.7' $MAGISKBIN/util_functions.sh \
-    && ui_print "  *Note*: a Magisk 16.7 bug causes $MODID to generate empty verbose logs (\"set -x\" doesn't work properly)" \
-    && ui_print " "
+  # a note on untested Magisk versions
+  if [ "$MAGISK_VER_CODE" -gt 1671 ]; then
+    # abort installation
+		ui_print " "
+		ui_print "(i) This Magisk version hasn't been tested by @VR25 as of yet."
+		ui_print "- Should you find any issue, try a newer Magisk version or downgrade to 15.0-16.6."
+    ui_print "- And don't forget to share your experience(s)! ;-)"
+		ui_print " "
+  fi
 }

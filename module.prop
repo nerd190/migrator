@@ -1,7 +1,7 @@
 id=adk
-name=App Data Keeper
-version=2018.8.28
-versionCode=201808280
+name=App Data Keeper (adk)
+version=2018.9.3
+versionCode=201809030
 author=VR25 @ xda-developers
-description=At the time of this writing, by default, a standard TWRP wipe (factory reset) obliterates everything in /data/data, except media, misc/vold and system/storage.xml. This module protects select apps' data from being wiped out. Thus, greatly reducing the amount of time required for setting up a new system. Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities. Protected data and respective APK's are automatically backed up. Bonus: TWRP boot time and backup sizes are greatly reduced when a significant amount of app data is protected. Read the general documentation (README.md) prior to installing/upgrading. NEVER "downgrade" directly; uninstall and reboot first.
+description=This module protects select apps' data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of time required for setting up a new system. Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities. Protected data and respective APK's are automatically backed up. Bonus: TWRP boot time and backup sizes are greatly reduced when a significant amount of app data is protected. Read the general documentation (README.md) prior to installing/upgrading. NEVER "downgrade" directly; uninstall and reboot first.
 minMagisk=1500

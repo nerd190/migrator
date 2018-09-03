@@ -22,14 +22,13 @@ bkpFreq="$(sed -n 's/^bkpFreq=//p' "$Config" 2>/dev/null)"
 main() {
   if grep -q '^[a-z]' $Config 2>dev/null || [ -n "$(ls "$appData" 2>/dev/null)" ]; then
     awk '{print $1,$2}' $pkgList | \
-      while read line; do
-        (LINE=$line
-        if ! [ -d "/data/app/$(pkg_name_)-1" -o -d "/data/app/$(pkg_name_)-2" ]; then
+      while read Line; do
+        (if ! [ -d "/data/app/$(pkg_name_)-1" -o -d "/data/app/$(pkg_name_)-2" ]; then
           # system app
           if grep -q "^inc $(pkg_name_)" $Config 2>/dev/null; then
             mv_bind_mount
           else
-            restore_exc $LINE
+            restore_exc $Line
           fi
         else
           # treat as user app
@@ -38,7 +37,7 @@ main() {
           then
             mv_bind_mount
           else
-            restore_exc $LINE
+            restore_exc $Line
           fi
         fi) &
       done
@@ -47,7 +46,7 @@ main() {
 }
 
 
-pkg_name_() { echo "$LINE" | awk '{print $1}'; }
+pkg_name_() { echo "$Line" | awk '{print $1}'; }
 pkg_name() { echo $APK | sed 's/\.apk//'; }
 
 
@@ -55,10 +54,10 @@ pkg_name() { echo $APK | sed 's/\.apk//'; }
 # $1=pkgName $2=dataOwner
 mv_bind_mount() {
   if [ -n "$(ls "$appData/$(pkg_name_)" 2>/dev/null)" ]; then
-    bind_mount $LINE
+    bind_mount $Line
   else
-    movef $LINE
-    bind_mount $LINE
+    movef $Line
+    bind_mount $Line
   fi
 }
 
@@ -145,7 +144,7 @@ bkp_apps() {
 # Remove all backups of uninstalled apps
 rm_uninstalled() {
   removed=false
-  for Pkg in $(ls $appdataBkps 2>/dev/null | grep -v 'lost+found'); do
+  for Pkg in $(ls $appdataBkps 2>/dev/null); do
     if ! grep -q "$Pkg" "$pkgList"; then
       echo "- $Pkg"
       [ -f "$appBkps/$Pkg" ] && rm "$appBkps/$Pkg"
@@ -244,7 +243,7 @@ restore_apps() {
 
 
 restore_data() {
-  if ls "$appdataBkps" 2>/dev/null | grep -v 'lost+found' | grep -q '[a-z]'; then
+  if ls "$appdataBkps" 2>/dev/null | grep -q '[a-z]'; then
     mk_restore_list installed
     restore_prompt
     if grep -q '[a-z]' $modData/.restore_tmp; then
@@ -259,7 +258,7 @@ restore_data() {
 
 
 restore_apps_and_data() {
-  if ls "$appdataBkps" 2>/dev/null | grep -v 'lost+found' | grep -q '[a-z]'; then
+  if ls "$appdataBkps" 2>/dev/null | grep -q '[a-z]'; then
     mk_restore_list not_installed
     if [ -z "$RestoreList" ]; then
       echo -e "(i) Nothing left to restore\n"
@@ -324,6 +323,7 @@ ACTIONS
 
 
 backups() {
+  restore_lite
   # remove empty folders
   for d in $appData/*; do
     rmdir "$d" 2>/dev/null
@@ -400,7 +400,7 @@ restore_prompt() {
 
 mk_restore_list() {
   RestoreList=""
-  for App in $(ls "$appdataBkps" | grep -v 'lost+found'); do
+  for App in $(ls "$appdataBkps"); do
     [ "$1" = not_installed ] && { grep -q "$App" "$pkgList" && Test=false || Test=true; } \
       || { grep -q "$App" "$pkgList" && Test=true || Test=false; }
     if $Test; then
@@ -450,7 +450,31 @@ bkp_symlinks() {
 
 restore_symlinks() {
   cat "$appdataBkps/$Pkg/symlinks.list" | \
-    while read line; do
-      ln -s $line 2>/dev/null
+    while read Line; do
+      ln -s $Line 2>/dev/null
     done
+}
+
+
+restore_lite() {
+  if grep -q '^lite' $Config 2>/dev/null && ls $appData 2>/dev/null | grep -q '[a-z].*.apk'; then
+    #until grep -q /storage/emulated /proc/mounts; do sleep 2; done
+    for Pkg in $(ls -1d $appData/* | sed 's:.*/::'); do
+      preInstalled=false
+      if grep -q "$Pkg" "$pkgList"; then
+        preInstalled=true
+        pm install -r "$appData/${Pkg}.apk" 1>/dev/null
+      else
+        pm install "$appData/${Pkg}.apk" 1>/dev/null
+      fi
+      $preInstalled && pm disable "$Pkg" 1>/dev/null
+      rm -rf "/data/data/$Pkg"
+      mv "$appData/$Pkg" /data/data/
+      o="$(grep "$Pkg" "$pkgList" | awk '{print $2}')"
+      chown -R "$o:$o" "/data/data/$Pkg" 2>/dev/null
+      #chmod -R 771 "/data/data/$Pkg" 2>/dev/null
+      $preInstalled && pm enable "$Pkg" 1>/dev/null
+      (rm -rf "$appData/$Pkg"*) &
+    done
+  fi
 }

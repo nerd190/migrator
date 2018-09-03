@@ -9,6 +9,7 @@ SYNTAX
       bkpFreq=8
 
   Include all user and *updated* system apps
+
       inc
 
   Include pkgName (this works for any app, and it's the only way to *include non-update-able system apps*)

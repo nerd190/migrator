@@ -18,9 +18,12 @@ set -u # exit on unset or null variable/parameter
 setenforce 0 # sets SELinux mode to "permissive"
 umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
 
-# verbose generator
+# log engine
 mkdir -p $logsDir 2>/dev/null
 [ -f "$newLog" ] && mv $newLog $oldLog
+set +u
+[ -n $EPOCHREALTIME ] && PS4='[$EPOCHREALTIME] '
+set -u
 set -x 2>>$newLog
 
 # find modPath
