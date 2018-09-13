@@ -4,8 +4,8 @@ App Data Keeper (adk) Config
 
 SYNTAX
 
-  Incremental apps' data backup frequency in hours (value must be an integer, default: 8)
-  
+  Incremental apps data backup frequency in hours (value must be an integer, default: 8)
+
       bkpFreq=8
 
   Include all user and *updated* system apps
@@ -13,20 +13,28 @@ SYNTAX
       inc
 
   Include pkgName (this works for any app, and it's the only way to *include non-update-able system apps*)
-  
+
       inc pkgName
 
   Exclude *user* app (overrides "inc" and "inc pkgName")
-  
+
       exc pkgName
 
   Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
-  
-      bkp [extra rsync option(s)] [SOURCE(s)] [DEST]
-    
+
+      bkp <extra rsync option(s)> <SOURCE(s)> <DEST>
+
     Tip: use $i for internal storage and $e for external media (largest partition) as opposed to writing full paths.
-    
+
     For rsync-specific details, refer to its man page.
+
+  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) after apps+data migration (untested on encrypted data)
+
+      wipe
+
+  Do not migrate/auto-restore apps+data
+
+      noauto
 
 
 EXAMPLES
@@ -34,61 +42,69 @@ EXAMPLES
   App data protection setups
 
     All user and *updated* system apps, except Spotify
-    
+
       inc
-      
+
       exc com.spotify music
 
-    Only Android Keyboard (AOSP) (a non-update-able system app)
-    
-      inc com.android.inputmethod.latin
+    Only stock apps matching "mail" (non-update-able)
 
-    Android Keyboard (AOSP) and all user & *updated* system apps, except Spotify
-    
+      inc mail
+
+    Stock terminal, plus all user & *updated* system apps, except Spotify
+
       inc
-      
-      inc com.android.inputmethod.
-      
-      exc com.spotify music
+
+      inc term
+
+      exc com.spotify.music
 
     All user and *updated* system apps, except *updated* Google Play Services
-    
+
       inc
-      
+
       exc com.google.android.gms
 
   Backup setups
-  
+
     Full internal storage
-    
+
       bkp --del $i/ $e/full_internal_bkp
-    
+
     Specific data
-    
+
       bkp --del $i/Download $i/Dukto $e/important_data
-    
+
     Some data to some remote machine
-    
-      bkp -e "ssh -i /path/to/key" SOURCE user@host:DESTINATION
-    
+
+      bkp -e "ssh -i /path/to/key" SOURCE user@host:/DESTINATION
+
     Sync all backed up apps and respective data to a remote machine
 
-      bkp -e "ssh -i /path/to/key" $appBkps $appdataBkps user@host:DESTINATION
-    
-    
-NOTES
+      bkp -e "ssh -i /path/to/ssh/key" $appBkps $appdataBkps user@host:/DESTINATION
+
+
+NOTES/TIPS
 
   A bare "inc" affects user and updated system apps only.
-  
-  An empty/null config disables all features. If data protection was enabled, app data is automatically moved back to /data/data on the next boot. Data is also automatically restored the next boot after adk is disabled/uninstalled.
+
+  An empty/null config disables all features.
+
+  Any line containing leading and/or trailing pounds/spaces and/or any other additional characters is ignored.
+
+  Instead of having multiple inc/exc lines, globbing/regex patterns can be used to match multiple packages (i.e., "exc google", "inc sp.*fy|ctionary|mail", without quotes).
 
   Only inc'd (included) apps are backed up.
 
+  The word "provider" matches all packages which store/provide contacts, SMSs/MMSs, call logs, etc..
+
   Updated system apps are treated as user apps.
 
-  Valid config lines have no leading nor trailing pounds/spaces and/or any other additionall characters.
+  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
 
 
 DEFAULT CONFIG
 
 inc
+inc term|provider
+#wipe

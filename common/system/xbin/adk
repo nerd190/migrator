@@ -1,34 +1,51 @@
 #!/system/bin/sh
-# App Data Keeper (adk) Terminal Toolkit
+# App Data Keeper (adk) wizard
 # Copyright (C) 2018, VR25 @ xda-developers
 # License: GPL v3+
 
 
+# shell behavior
+set -o errexit # set -e
+set -o nounset # set -u
+set -o pipefail
+#set -o xtrace # set -x
+#IFS=$'\n\t' # new line & tab
+umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
+
 modId=adk
 modData=/data/media/$modId
+Config=$modData/config.txt
 logsDir=$modData/logs
-logName=terminal
-newLog=$logsDir/${logName}.log
-oldLog=$logsDir/${logName}_old.log
+logFile=$logsDir/wizard.log
+oldLog=$logFile.old
 
 # prepend Magisk's busybox to PATH
 PATH=/sbin/.core/busybox:$PATH
 
-set -u # exit on unset or null variable/parameter
-setenforce 0 # sets SELinux mode to "permissive"
-umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
-
 # log engine
-mkdir -p $logsDir 2>/dev/null
-[ -f "$newLog" ] && mv $newLog $oldLog
+mkdir -p $logsDir
+[ -f "$logFile" ] && mv $logFile $oldLog
 set +u
-[ -n $EPOCHREALTIME ] && PS4='[$EPOCHREALTIME] '
+[ -n "$EPOCHREALTIME" ] && PS4='[$EPOCHREALTIME] '
 set -u
-set -x 2>>$newLog
+set -o xtrace 2>>$logFile # set -x
+
+# exit trap (debugging tool)
+debug_exit() {
+  echo -e "\n***EXIT $?***\n"
+  set +euxo pipefail
+  getprop | grep -Ei 'product|version'
+  echo
+  set
+  echo
+  echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
+    | sed 's/En/en/;s/Pe/pe/'
+} &>>$logFile
+trap debug_exit EXIT
 
 # find modPath
-modPath="$(sed -n 's/^.*MOUNTPATH=//p' /data/adb/magisk/util_functions.sh)/$modId"
+modPath=$(sed -n 's/^.*MOUNTPATH=//p' /data/adb/magisk/util_functions.sh)/$modId
 [ -f $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
 
-. $modPath/core.sh
+source $modPath/core.sh # load core
 wizard
