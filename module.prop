@@ -1,7 +1,7 @@
 id=adk
 name=App Data Keeper (adk)
-version=2018.9.13
-versionCode=201809130
+version=2018.9.13-1
+versionCode=201809131
 author=VR25 @ xda-developers
 description=This module protects select apps+data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of effort necessary for setting up a new system. Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities. Read the reference (README.md) prior to installing/upgrading.
 minMagisk=1500

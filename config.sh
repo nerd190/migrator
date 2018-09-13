@@ -365,7 +365,7 @@ prep_environment() {
   iBkps=$modData/backups
   eBkps=$externalStorage/$MODID/backups
 
-  curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop)
+  curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || true)
   [ -z "$curVer" ] && curVer=0
 
   # get CPU arch

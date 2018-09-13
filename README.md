@@ -210,6 +210,9 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 ---
 #### LATEST CHANGES
 
+**2018.9.13-1 (201809131)**
+- Fixed installation error on clean install.
+
 **2018.9.13 (201809130)**
 - Ability to change where to restore backups from.
 - Backups of uninstalled apps can be removed selectively.
