@@ -65,7 +65,7 @@ SYNTAX
 
     For rsync-specific details, refer to its man page.
 
-  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) after apps+data migration (untested on encrypted data)
+  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img and magis_mount/) after apps+data migration (untested on encrypted data)
 
       wipe
 
@@ -137,7 +137,7 @@ NOTES/TIPS
 
   Updated system apps are treated as user apps.
 
-  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
+  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/, system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/(magisk.*img|magisk_mount/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
 
 
 DEFAULT CONFIG
@@ -210,8 +210,15 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 ---
 #### LATEST CHANGES
 
+**2018.9.14 (201809140)**
+- Added support for odd package suffixes (/data/app/pkgName<suffix>) causing apps+data backup/restore to fail.
+- Fixed 'noauto config keyword not being properly recognized'.
+- On nonzero exit code, revert changes to the recovery environment and don't leave magisk image mounted.
+- Save \$Pkg symlinks to \$appDataBkps/\$Pkg.lns (formerly \$appDataBkps/\$Pkg/symlinks.list) for faster rsync update checks (faster incremental apps data backups).
+- The dedicated factory reset mechanism wipes /cache as well, exc. magisk.*img (for compat. with 'f2fsfix' module) and magisk_mount/.
+
 **2018.9.13-1 (201809131)**
-- Fixed installation error on clean install.
+- Fixed installation error (issue with clean install).
 
 **2018.9.13 (201809130)**
 - Ability to change where to restore backups from.

@@ -28,7 +28,7 @@ SYNTAX
 
     For rsync-specific details, refer to its man page.
 
-  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) after apps+data migration (untested on encrypted data)
+  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img and magis_mount/) after apps+data migration (untested on encrypted data)
 
       wipe
 
@@ -100,7 +100,7 @@ NOTES/TIPS
 
   Updated system apps are treated as user apps.
 
-  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
+  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/, system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/(magisk.*img|magisk_mount/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
 
 
 DEFAULT CONFIG

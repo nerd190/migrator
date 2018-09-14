@@ -107,12 +107,14 @@ set_permissions() {
 
 # exit trap (debugging tool)
 debug_exit() {
-  echo -e "\n***EXIT $?***\n"
+  local e=$?
+  echo -e "\n***EXIT $e***\n"
   set +euxo pipefail
   set
   echo
   echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
     | sed 's/En/en/;s/Pe/pe/'
+  exxit $e $e >/dev/null 2>&1
 } >&2
 trap debug_exit EXIT
 
@@ -201,10 +203,12 @@ migrate_bkps() {
 
 exxit() {
   set +euxo pipefail
-  unmount_magisk_img
-  $BOOTMODE || recovery_cleanup
-  set -u
-  rm -rf $TMPDIR
+  if [ "$2" -ne 0 ]; then
+    unmount_magisk_img
+    $BOOTMODE || recovery_cleanup
+    set -u
+    rm -rf $TMPDIR
+  fi
   exit $1
 }
 
@@ -218,14 +222,12 @@ factory_reset_or_uninstall() {
       ui_print "(i) $MODID will be removed at next boot."
 
     else
-      set +e
-      grep -q noauto $Config 2>/dev/null || migrate_data
-      set -e
+      grep -q '^noauto' $Config 2>/dev/null || migrate_data
 
       # wipe data
       if grep -q '^wipe$' $Config 2>/dev/null; then
         ui_print " "
-        ui_print "(i) Wiping /data (exc. adb/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/))..."
+        ui_print "(i) Wiping /data (exc. adb/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img & magisk_mount/)..."
 
         for e in $(ls -1A /data 2>/dev/null \
           | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
@@ -263,8 +265,14 @@ factory_reset_or_uninstall() {
         done
 
         for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
-          rm -rf $d
+          (rm -rf $d) &
         done
+
+        if mount -o remount,rw /cache 2>/dev/null; then
+          for e in $(ls -1A /cache 2>/dev/null | grep -Ev '^magisk.*img$|^magisk_mount$' 2>/dev/null); do
+            (rm -rf /cache/$e) &
+          done
+        fi
 
         wait
         ui_print "- Done."
@@ -305,7 +313,8 @@ migrate_data() {
     set -e
     awk '{print $1}' $pkgList | \
       while read Pkg; do
-        (if ! ls -p /data/app/$Pkg* 2>/dev/null | grep -q /; then
+        (Pkg=$Pkg # make sure value doesn't change until subshell exits
+        if ! ls -p /data/app/$Pkg* 2>/dev/null | grep -q /; then
           # system app
           match_test inc $Pkg && migrate_apk_plus_data
         else
@@ -318,15 +327,16 @@ migrate_data() {
         fi) &
       done
     migrate_bkps
-    wait # for background jobs to finish
+    wait
     ui_print "- Done."
   fi
 }
 
 
-# migrate APK's and respective data to $migratedData
+# migrate APKs and respective data to $migratedData
 migrate_apk_plus_data() {
-  mkdir -p $migratedData
+  mkdir -p $migratedData $migratedData
+  bkp_symlinks
   mv /data/data/$Pkg $migratedData/
   set +eo pipefail
   mv $(find /data/app/$Pkg* type f -name base.apk 2>/dev/null | head -n 1) \
@@ -391,6 +401,16 @@ match_test() {
 }
 
 
+bkp_symlinks() {
+  local l lns=$migratedData/$Pkg.lns
+  : >$lns
+  for l in $(find /data/data/$Pkg -type l); do
+    echo "$(readlink -f $l | sed "s:$Pkg.*/lib/[^/]*:$Pkg\*/lib/\*:; s:$Pkg.*/lib/:$Pkg\*/lib/:") $l" >>$lns
+  done
+  grep -q '^/' $lns || rm $lns
+}
+
+
 version_info() {
 
   local c
@@ -400,23 +420,11 @@ version_info() {
   ui_print "  Facebook Support Page: https://facebook.com/VR25-at-xda-developers-258150974794782/"
   ui_print " "
 
-  whatsNew="- Ability to change where to restore backups from.
-- Backups of uninstalled apps can be removed selectively.
-- Blacklisted Magisk versions 17.0 and 17.1 in addition to 16.7 (adk will refuse to install; run 'touch /data/.adk' to override).
-- Block direct downgrade and direct legacy upgrade.
-- Cleaner design
-- Config keywords 'inc' and 'exc' work with globbing/regex patterns.
-- Improved backup/restore algorithms.
-- Migrate apps+data before factory reset & auto-restore everything shortly after boot (unless 'noauto' config keyword is set).
-- Misc fixes & optimizations
-- No more on-boot data moving nor bind-mounting.
-- Option to run all scheduled backups on demand (adk wizard, 4).
-- Removed standalone post-fs-data.d/adk.sh in favor of \$modPath/service.sh.
-- Save a copy of the default config.txt to \$MODPATH & automatically restore it whenever $Config is missing.
-- Save temp files to a non-persistent dir (/dev/adk_tmp).
-- SELinux mode is no longer altered.
-- Updated documentation & debugging constructs/tools (new log formats, better error reporting & handling, and more).
-- When the 'wipe' feature is enabled, all Magisk modules, plus adb keys, ssh config & keys and a bunch of other system data (i.e., accounts, contacts, SMSs/MMSs, call logs, saved Wi-Fi networks, settings, etc.) also survive factory resets."
+  whatsNew="- Added support for odd package suffixes (/data/app/pkgName<suffix>) causing apps+data backup/restore to fail.
+- Fixed 'noauto config keyword not being properly recognized'.
+- On nonzero exit code, revert changes to the recovery environment and don't leave magisk image mounted.
+- Save \$Pkg symlinks to \$appDataBkps/\$Pkg.lns (formerly \$appDataBkps/\$Pkg/symlinks.list) for faster rsync update checks (faster incremental apps data backups).
+- The dedicated factory reset mechanism wipes /cache as well, exc. magisk.*img (for compat. with 'f2fsfix' module) and magisk_mount/."
 
   ui_print "  WHAT'S NEW"
   echo "$whatsNew" | \

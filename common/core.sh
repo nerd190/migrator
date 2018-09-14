@@ -19,7 +19,7 @@ i=/sdcard # internal media storage
 
 
 # app data backup frequency (in hours)
-bkpFreq="$(sed -n 's/^bkpFreq=//p' "$Config" 2>/dev/null || true)"
+bkpFreq=$(sed -n 's/^bkpFreq=//p' "$Config" 2>/dev/null || true)
 [ -z "$bkpFreq" ] && bkpFreq=8 # fallback
 
 
@@ -48,7 +48,7 @@ find_sdcard() {
     [ "$1" = "nowait" ] || sleep 4
     set -u
     for e in /mnt/media_rw/*; do # $e=<external storage>
-      newSize=$(df "$e" | tail -n1 | awk '{print $2}')
+      newSize=$(df "$e" | tail -n 1 | awk '{print $2}')
       if [ "$newSize" -gt "$Size" ]; then
         Size=$newSize
         apkBkps="$e/adk/backups/apk"
@@ -59,14 +59,14 @@ find_sdcard() {
 }
 
 
-# backup APK's
+# backup APKs
 # defaultStorage=external ($e)
 # fallBackStorage=internal ($i)
 bkp_apps() {
   local Pkg pkgName
   mkdir -p "$apkBkps" "$appDataBkps"
   for Pkg in $(find /data/app -type f -name base.apk); do
-    pkgName=$(dirname $Pkg | sed 's:/data/app/::; s:-[0-9]::')
+    pkgName=$(dirname $Pkg | sed 's:/data/app/::; s:-.*::')
     if { grep -q '^inc$' $Config || match_test inc $pkgName; } \
       && ! match_test exc $pkgName
     then
@@ -134,7 +134,7 @@ bkp_appdata() {
         if match_test inc $Pkg; then
           $rsync -Drtu --del \
             --exclude=cache --exclude=code_cache \
-            --exclude=app_webview/GPUCache --exclude=symlinks.list \
+            --exclude=app_webview/GPUCache \
             --inplace /data/data/$Pkg "$appDataBkps" >/dev/null 2>&1 || true
           bkp_symlinks
         fi
@@ -144,7 +144,7 @@ bkp_appdata() {
         then
           $rsync -Drtu --del \
             --exclude=cache --exclude=code_cache \
-            --exclude=app_webview/GPUCache --exclude=symlinks.list \
+            --exclude=app_webview/GPUCache \
             --inplace /data/data/$Pkg "$appDataBkps" >/dev/null 2>&1 || true
           bkp_symlinks
         fi
@@ -299,7 +299,7 @@ backupd() {
   else
     set -u
     find_sdcard nowait
-    echo -n "(i) Backing up APK's..."
+    echo -n "(i) Backing up APKs..."
     bkp_apps
     echo -en "\n(i) Backing up apps data..."
     bkp_appdata $1
@@ -370,7 +370,7 @@ post_restore() {
 
 
 regex_prompt() {
-  local i
+  local i=""
   echo
   echo -n "(i) Input pattern(s) to match (i.e., sp.*fy or duk|faceb|whats. A dot matches all)... "
   read i
@@ -381,8 +381,11 @@ regex_prompt() {
 mk_list() {
   local Pkg Test
   : >$tmpDir/pkg_list0
-  for Pkg in $(ls -1 $appDataBkps); do
-    [ "$1" = not_installed ] && { grep -q "$Pkg" "$pkgList" && Test=false || Test=true; } \
+  for Pkg in $(find $appDataBkps -type d -maxdepth 1 \
+    | sed "s:$appDataBkps/::")
+  do
+    [ "$1" = not_installed ] \
+      && { grep -q "$Pkg" "$pkgList" && Test=false || Test=true; } \
       || { grep -q "$Pkg" "$pkgList" && Test=true || Test=false; }
     if $Test; then
       echo "- $Pkg"
@@ -399,9 +402,9 @@ restore() {
     echo -n "- $Pkg"
     [ "$1" = "apps+data" ] && { pm install "$apkBkps/$Pkg.apk" 1>/dev/null || true; }
     pm disable "$Pkg" 1>/dev/null || true
-    $rsync -Drt --del --exclude=symlinks.list "$appDataBkps/$Pkg/" /data/data/$Pkg
+    $rsync -Drt --del "$appDataBkps/$Pkg/" /data/data/$Pkg
     echo
-    restore_symlinks
+    restore_symlinks $appDataBkps/$Pkg.lns
     o=$(grep "$Pkg" "$pkgList" | awk '{print $2}')
     chown -R $o:$o /data/data/$Pkg
     chmod -R 771 /data/data/$Pkg
@@ -423,29 +426,32 @@ exit_or_not() {
 
 
 bkp_symlinks() {
-  local l
-  : >"$appDataBkps/$Pkg/symlinks.list"
+  local l lns="$appDataBkps/$Pkg.lns"
+  : >"$lns"
   for l in $(find /data/data/$Pkg -type l); do
-    echo "$(readlink -f $l) $l" >>"$appDataBkps/$Pkg/symlinks.list" 2>/dev/null
+    echo "$(readlink -f $l | sed "s:$Pkg.*/lib/[^/]*:$Pkg\*/lib/\*:; s:$Pkg.*/lib/:$Pkg\*/lib/:") $l" >>$lns
   done
+  grep -q '^/' "$lns" || rm "$lns"
 }
 
 
 restore_symlinks() {
   local l
-  cat "$appDataBkps/$Pkg/symlinks.list" | \
-    while read l; do
-      ln -s $l 2>/dev/null
-    done
+  if [ -f "$1" ]; then
+    cat "$1" | \
+      while read l; do
+        eval ln -fs $l || true
+      done
+  fi
 }
 
 
 restore_on_boot() {
   local Pkg o
   if ls -p $migratedData 2>/dev/null | grep -q / \
-    && ! grep -q noauto $Config
+    && ! grep -q '^noauto' $Config
   then
-    set +e
+    set +eo pipefail
     wait_booted
     for Pkg in $(ls -1p $migratedData | grep / | tr -d /); do
       if grep -q $Pkg $pkgList; then
@@ -461,6 +467,8 @@ restore_on_boot() {
         pm disable $Pkg 1>/dev/null
         rm -rf /data/data/$Pkg
         mv $migratedData/$Pkg /data/data/
+        restore_symlinks $migratedData/$Pkg.lns
+        rm $migratedData/$Pkg.lns
         o=$(grep "$Pkg" "$pkgList" | awk '{print $2}')
         chown -R $o:$o /data/data/$Pkg 2>/dev/null
         pm enable $Pkg 1>/dev/null
@@ -471,7 +479,7 @@ restore_on_boot() {
       fi
     done
     rm -rf $migratedData
-    set -e
+    set -eo pipefail
   fi
 }
 
