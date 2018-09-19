@@ -89,7 +89,7 @@ set_permissions() {
   set_perm_recursive  $MODPATH  0  0  0755  0644
 
   # Permissions for executables
-  for f in $MODPATH/bin/* $MODPATH/system/bin/* $MODPATH/system/xbin/*; do
+  for f in $MODPATH/bin/* $MODPATH/system/bin/* $MODPATH/system/xbin/* $MODPATH/*.sh; do
     [ -f "$f" ] && set_perm $f  0  0  0755
   done
 }
@@ -124,27 +124,7 @@ install_module() {
   prep_environment
 
   # force reinstall if file exists (debugging)
-  [ -f /data/.adk ] || factory_reset_or_uninstall
-
-  # do not support flawed Magisk versions
-  if echo $magiskVer | grep -Eq '167|170|171' && [ ! -f /data/.adk ]; then
-    ui_print " "
-    ui_print "(!) Magisk $MAGISK_VER is officially unsupported!"
-    ui_print "- It has some big and scary bugs which love eating several modules' heads."
-    ui_print "- Try a newer Magisk version or downgrade to 15.0-16.6."
-    ui_print "- Or run 'touch /data/.adk' to override, a.k.a., install $MODID anyway (for debugging purposes only)."
-    ui_print " "
-    exxit 1
-  fi
-
-  # block direct downgrade
-  if [ "$curVer" -gt "$(i versionCode)" ]; then
-    ui_print " "
-    ui_print "(!) Direct downgrade is forbidden!"
-    ui_print "- Uninstall AND reboot into system first."
-    ui_print " "
-    exxit 1
-  fi
+  [ -f /data/.$MODID ] || factory_reset_or_uninstall
 
   # block direct legacy upgrade
   if [ "$curVer" -lt 201809130 -a "$curVer" -ne 0 ] \
@@ -156,14 +136,6 @@ install_module() {
     ui_print "- Uninstall $MODID AND reboot into system first."
     ui_print " "
     exxit 1
-  fi
-
-  # update config & remove obsolete files
-  if [ "$curVer" -lt 201809130 ]; then
-    cp -f $INSTALLER/common/config.txt $Config
-    rm $modData/logs/* \
-      $MOUNTPATH0/.core/post-fs-data.d/adk.sh \
-      $MOUNTPATH0/.core/service.d/adk.sh 2>/dev/null || true
   fi
 
   # create module paths
@@ -180,11 +152,19 @@ install_module() {
   mv -f License* README* $modInfo/
   cp $MODPATH/config.txt $MODPATH/default_config.txt
 
+  # update config & remove obsolete files
+  if [ "$curVer" -lt 201809130 ]; then
+    cp -f $MODPATH/config.txt $Config
+    rm $modData/logs/* \
+      $MOUNTPATH0/.core/post-fs-data.d/$MODID.sh \
+      $MOUNTPATH0/.core/service.d/$MODID.sh 2>/dev/null || true
+  fi
+
   # set default config if $Config is missing
   [ -f "$Config" ] && rm $MODPATH/config.txt \
     || mv $MODPATH/config.txt $Config
 
-  [ -f /data/.adk ] && rm /data/.adk
+  [ -f /data/.$MODID ] && rm /data/.$MODID
   set +euxo pipefail
 }
 
@@ -214,7 +194,7 @@ exxit() {
 
 
 factory_reset_or_uninstall() {
-  local d e
+  local d="" e=""
   if [ "$curVer" -eq "$(i versionCode)" ]; then
     if $BOOTMODE; then
       touch $MOUNTPATH0/$MODID/remove
@@ -287,9 +267,8 @@ factory_reset_or_uninstall() {
 
 
 find_sdcard() {
-  local d Size newSize
+  local d="" Size=0 newSize=0
   if grep -q '/mnt/media_rw' /proc/mounts; then
-    Size=0
     for d in /mnt/media_rw/*; do
       newSize=$(df "$d" | tail -n 1 | awk '{print $2}')
       if [ "$newSize" -gt "$Size" ]; then
@@ -302,7 +281,7 @@ find_sdcard() {
 
 
 migrate_data() {
-  local Pkg
+  local Pkg=""
   if grep -Eq '^inc$|^inc ' $Config 2>/dev/null; then
     ui_print " "
     ui_print "(i) Migrating data..."
@@ -393,7 +372,7 @@ prep_environment() {
 #$1="inc or exc"
 #$2=pkgName
 match_test() {
-  local p
+  local p=""
   for p in $(sed -n "s/^$1 //p" $Config); do
     echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || true
   done
@@ -402,7 +381,7 @@ match_test() {
 
 
 bkp_symlinks() {
-  local l lns=$migratedData/$Pkg.lns
+  local l="" lns=$migratedData/$Pkg.lns
   : >$lns
   for l in $(find /data/data/$Pkg -type l); do
     echo "$(readlink -f $l | sed "s:$Pkg.*/lib/[^/]*:$Pkg\*/lib/\*:; s:$Pkg.*/lib/:$Pkg\*/lib/:") $l" >>$lns
@@ -413,19 +392,17 @@ bkp_symlinks() {
 
 version_info() {
 
-  local c
+  local c=""
   set -euxo pipefail
 
-  ui_print " "
-  ui_print "  Facebook Support Page: https://facebook.com/VR25-at-xda-developers-258150974794782/"
-  ui_print " "
+  whatsNew="- Fixed 'wrong instruction to create $modData upon install'.
+- Fixed 'rsync_util(), bad i variable'
+- Magisk 17.1 support
+- Performance and reliability improvements
+- Suppress irrelevant 'ln -s' error messages.
+- Wizard, 3 -- option to choose whether already installed apps should be filtered out."
 
-  whatsNew="- Added support for odd package suffixes (/data/app/pkgName<suffix>) causing apps+data backup/restore to fail.
-- Fixed 'noauto config keyword not being properly recognized'.
-- On nonzero exit code, revert changes to the recovery environment and don't leave magisk image mounted.
-- Save \$Pkg symlinks to \$appDataBkps/\$Pkg.lns (formerly \$appDataBkps/\$Pkg/symlinks.list) for faster rsync update checks (faster incremental apps data backups).
-- The dedicated factory reset mechanism wipes /cache as well, exc. magisk.*img (for compat. with 'f2fsfix' module) and magisk_mount/."
-
+  ui_print " "
   ui_print "  WHAT'S NEW"
   echo "$whatsNew" | \
     while read c; do
@@ -439,11 +416,16 @@ version_info() {
   ui_print " "
 
   # a note on untested Magisk versions
-  if [ "$magiskVer" -gt 167 ]; then
+  if [ "$magiskVer" -gt 171 ]; then
     ui_print " "
-    ui_print "(i) This Magisk version hasn't been tested by @VR25 as of yet."
-    ui_print "- Should you find any issue, try a newer Magisk version or downgrade to 15.0-16.6."
-    ui_print "- And don't forget to share your experience(s)! ;-)"
+    ui_print "  (i) Magisk $MAGISK_VER hasn't been tested by @VR25!"
+    ui_print "  - If you come across any issue, please report."
     ui_print " "
   fi
+
+  ui_print "  LINKS"
+  ui_print "    - Facebook Page: facebook.com/VR25-at-xda-developers-258150974794782"
+  ui_print "    - Git Repository: github.com/Magisk-Modules-Repo/App-Data-Keeper"
+  ui_print "    - XDA Thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278"
+  ui_print " "
 }

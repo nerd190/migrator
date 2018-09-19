@@ -28,7 +28,7 @@ main() {
   set +u
   [ -n "$EPOCHREALTIME" ] && PS4='[$EPOCHREALTIME] '
   set -u
-  exec &>>$logFile
+  exec 1>>$logFile 2>&1
   set -o xtrace # set -x
 
   # exit trap (debugging tool)

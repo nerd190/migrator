@@ -210,6 +210,14 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 ---
 #### LATEST CHANGES
 
+**2018.9.19 (201809190)**
+- Fixed 'wrong instruction to create $modData upon install'.
+- Fixed 'rsync_util(), bad i variable'
+- Magisk 17.1 support
+- Performance and reliability improvements
+- Suppress irrelevant 'ln -s' error messages.
+- Wizard, 3 -- option to choose whether already installed apps should be filtered out.
+
 **2018.9.14 (201809140)**
 - Added support for odd package suffixes (/data/app/pkgName<suffix>) causing apps+data backup/restore to fail.
 - Fixed 'noauto config keyword not being properly recognized'.
@@ -219,43 +227,3 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 
 **2018.9.13-1 (201809131)**
 - Fixed installation error (issue with clean install).
-
-**2018.9.13 (201809130)**
-- Ability to change where to restore backups from.
-- Backups of uninstalled apps can be removed selectively.
-- Blacklisted Magisk versions 17.0 and 17.1 in addition to 16.7 (adk will refuse to install; run touch /data/.adk to override).
-- Block direct downgrade and direct legacy upgrade.
-- Cleaner design
-- Config keywords 'inc' and 'exc' work with globbing/regex patterns.
-- Improved backup/restore algorithms.
-- Migrate apps+data before factory reset & auto-restore everything shortly after boot (unless 'noauto' config keyword is set).
-- Misc fixes & optimizations
-- No more on-boot data moving nor bind-mounting.
-- Option to run all scheduled backups on demand (adk wizard, 4).
-- Removed standalone post-fs-data.d/adk.sh in favor of \$modPath/service.sh.
-- Save a copy of the default config.txt to \$MODPATH & automatically restore it whenever $Config is missing.
-- Save temp files to a non-persistent dir (/dev/adk_tmp).
-- SELinux mode is no longer altered.
-- Updated documentation & debugging constructs/tools (new log formats, better error reporting & handling, and more).
-- When the 'wipe' feature is enabled, all Magisk modules, plus adb keys, ssh config & keys and a bunch of other system data (i.e., accounts, contacts, SMSs/MMSs, call logs, saved Wi-Fi networks, settings, etc.) also survive factory resets.
-  *Release notes*: $Config will be overwritten (new info). Uninstall AND reboot into system before upgrading (installation will fail otherwise, as apps data must be migrated first).
-
-**2018.9.3 (201809030)**
-- Improved log engine
-- Misc enhancements
-- Most of 'lite mode' is ready
-- Moved igniter (adk.sh) from post-fs-data.d to service.d
-- service.sh merged into adk.sh
-- Updated reference
-
-**2018.8.28 (201808280)**
-- Protected data and respective APK's are automatically backed up to largest_external_partition/adk/backups (fallback -- /data/media/adk/backups)
-- Removed 'rollback' executable (obsolete)
-- Support for automatic (scheduled) as well as on-demand incremental backups
-- Magisk module template 1500
-- Migrate app data to '/data/media/adk/appdata'
-- More efficient APK backups
-- Restrict app data permissions to 'rwx-rwx-x (771)'
-- Terminal 'adk' wizard
-- Updated documentation
-- Zillion+ features, fixes and improvements
