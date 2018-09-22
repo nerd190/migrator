@@ -210,6 +210,11 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 ---
 #### LATEST CHANGES
 
+**2018.9.22 (201809220)**
+- Exclude $modData and <external storage>/$MODID from media scan.
+- Use legacy variable increment syntax to prevent malfunction in legacy shells.
+- White-list irrelevant 'chmod' and 'chown' errors causing some manual restores to fail.
+
 **2018.9.19 (201809190)**
 - Fixed 'wrong instruction to create $modData upon install'.
 - Fixed 'rsync_util(), bad i variable'
@@ -224,6 +229,3 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 - On nonzero exit code, revert changes to the recovery environment and don't leave magisk image mounted.
 - Save \$Pkg symlinks to \$appDataBkps/\$Pkg.lns (formerly \$appDataBkps/\$Pkg/symlinks.list) for faster rsync update checks (faster incremental apps data backups).
 - The dedicated factory reset mechanism wipes /cache as well, exc. magisk.*img (for compat. with 'f2fsfix' module) and magisk_mount/.
-
-**2018.9.13-1 (201809131)**
-- Fixed installation error (issue with clean install).

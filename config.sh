@@ -395,12 +395,9 @@ version_info() {
   local c=""
   set -euxo pipefail
 
-  whatsNew="- Fixed 'wrong instruction to create $modData upon install'.
-- Fixed 'rsync_util(), bad i variable'
-- Magisk 17.1 support
-- Performance and reliability improvements
-- Suppress irrelevant 'ln -s' error messages.
-- Wizard, 3 -- option to choose whether already installed apps should be filtered out."
+  whatsNew="- Exclude $modData and <external storage>/$MODID from media scan.
+- Use legacy variable increment syntax to prevent malfunction in legacy shells.
+- White-list irrelevant 'chmod' and 'chown' errors causing some manual restores to fail."
 
   ui_print " "
   ui_print "  WHAT'S NEW"

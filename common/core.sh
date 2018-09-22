@@ -24,6 +24,7 @@ bkpFreq=$(sed -n 's/^bkpFreq=//p' "$Config" 2>/dev/null || true)
 
 # preparation
 mkdir -p $tmpDir
+touch $modData/.nomedia
 [ -f "$Config" ] || cp $defaultConfig $Config
 
 
@@ -36,7 +37,7 @@ find_sdcard() {
     set -u
     wait_booted
     until [ "$Count" -ge "360" ]; do
-      ((Count++)) || true
+      Count=$((Count + 1)) || true
       grep -q '/mnt/media_rw' /proc/mounts && break || sleep 4
     done
   fi
@@ -52,6 +53,7 @@ find_sdcard() {
         Size=$newSize
         apkBkps="$e/adk/backups/apk"
         appDataBkps="$e/adk/backups/appdata"
+        touch "$e/adk/.nomedia"
       fi
     done
   fi

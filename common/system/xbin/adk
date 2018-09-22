@@ -315,8 +315,8 @@ restore() {
     echo
     restore_symlinks $appDataBkps/$Pkg.lns
     o=$(grep "$Pkg" "$pkgList" | awk '{print $2}')
-    chown -R $o:$o /data/data/$Pkg
-    chmod -R 771 /data/data/$Pkg
+    chown -R $o:$o /data/data/$Pkg 2>/dev/null || true
+    chmod -R 771 /data/data/$Pkg 2>/dev/null || true
     pm enable "$Pkg" 1>/dev/null
   done
   post_restore $1 $2
