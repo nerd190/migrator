@@ -207,7 +207,7 @@ factory_reset_or_uninstall() {
       # wipe data
       if grep -q '^wipe$' $Config 2>/dev/null; then
         ui_print " "
-        ui_print "(i) Wiping /data (exc. adb/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img & magisk_mount/)..."
+        ui_print "(i) Wiping /data (exc. adb/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img & magisk_mount/)..."
 
         for e in $(ls -1A /data 2>/dev/null \
           | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
@@ -221,7 +221,7 @@ factory_reset_or_uninstall() {
           (rm -rf /data/data/$e) &
         done
 
-        for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^vold$|^wifi$' 2>/dev/null)
+        for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
         do
           (rm -rf /data/misc/$e) &
         done
@@ -326,13 +326,7 @@ migrate_apk_plus_data() {
 
 prep_environment() {
 
-  # shell behavior
-  set -o errexit # set -e
-  set -o nounset # set -u
-  set -o pipefail
-  set -o xtrace # set -x
-  #IFS=$'\n\t' # new line & tab
-  #umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
+  set -euxo pipefail
 
   modData=/data/media/$MODID
   migratedData=$modData/migrated_data
@@ -348,7 +342,8 @@ prep_environment() {
 
   if $BOOTMODE; then
     find_sdcard
-    MOUNTPATH0=$(sed -n 's/^.*MOUNTPATH=//p' $utilFunc | head -n 1)
+    MOUNTPATH0=/sbin/.magisk/img
+    [ -e $MOUNTPATH0 ] || MOUNTPATH0=/sbin/.core/img
   fi
 
   iBkps=$modData/backups
@@ -392,12 +387,20 @@ bkp_symlinks() {
 
 version_info() {
 
-  local c=""
-  set -euxo pipefail
+  local c="" whatsNew="- [adkd] Pause execution until /data is decrypted
+- [General] Fixes and optimizations
+- [General] Magisk 18 support
+- [Misc] Updated building and debugging tools
+- [\"wipe\"] Preserve Bluetooth settings"
 
-  whatsNew="- Exclude $modData and <external storage>/$MODID from media scan.
-- Use legacy variable increment syntax to prevent malfunction in legacy shells.
-- White-list irrelevant 'chmod' and 'chown' errors causing some manual restores to fail."
+  set -euo pipefail
+
+  # a note on untested Magisk versions
+  if [ ${MAGISK_VER/.} -gt 180 ]; then
+    ui_print " "
+    ui_print "  (i) NOTE: this Magisk version hasn't been tested by @VR25!"
+    ui_print "    - If you come across any issue, please report."
+  fi
 
   ui_print " "
   ui_print "  WHAT'S NEW"
@@ -412,17 +415,9 @@ version_info() {
   fi
   ui_print " "
 
-  # a note on untested Magisk versions
-  if [ "$magiskVer" -gt 171 ]; then
-    ui_print " "
-    ui_print "  (i) Magisk $MAGISK_VER hasn't been tested by @VR25!"
-    ui_print "  - If you come across any issue, please report."
-    ui_print " "
-  fi
-
   ui_print "  LINKS"
   ui_print "    - Facebook Page: facebook.com/VR25-at-xda-developers-258150974794782"
-  ui_print "    - Git Repository: github.com/Magisk-Modules-Repo/App-Data-Keeper"
+  ui_print "    - Git Repository: github.com/Magisk-Modules-Repo/adk"
   ui_print "    - XDA Thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278"
   ui_print " "
 }

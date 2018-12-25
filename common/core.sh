@@ -5,27 +5,27 @@
 
 modId=adk
 modData=/data/media/$modId
-Config=$modData/config.txt
+config=$modData/config.txt
 defaultConfig=$modPath/default_config.txt
 migratedData=$modData/migrated_data
 apkBkps=$modData/backups/apk
 pkgList=/data/system/packages.list # installed packages
 appDataBkps=$modData/backups/appdata
-tmpDir=/dev/adk_tmp
+tmpDir=/dev/adk
 rsync=$modPath/bin/rsync
 failedRes=$modData/failed_restores
 i=/sdcard # internal media storage
 
 
-# app data backup frequency (in hours)
-bkpFreq=$(sed -n 's/^bkpFreq=//p' "$Config" 2>/dev/null || true)
+# apps' data backup frequency (in hours)
+bkpFreq=$(sed -n 's/^bkpFreq=//p' "$config" 2>/dev/null || true)
 [ -z "$bkpFreq" ] && bkpFreq=8 # fallback
 
 
 # preparation
 mkdir -p $tmpDir
 touch $modData/.nomedia
-[ -f "$Config" ] || cp $defaultConfig $Config
+[ -f $config ] || cp $defaultConfig $config
 
 
 # wait 90 seconds for external storage ($e)
@@ -53,6 +53,7 @@ find_sdcard() {
         Size=$newSize
         apkBkps="$e/adk/backups/apk"
         appDataBkps="$e/adk/backups/appdata"
+        mkdir -p "$apkBkps" "$appDataBkps"
         touch "$e/adk/.nomedia"
       fi
     done
@@ -68,7 +69,7 @@ bkp_apps() {
   mkdir -p "$apkBkps" "$appDataBkps"
   for Pkg in $(find /data/app -type f -name base.apk); do
     pkgName=$(dirname $Pkg | sed 's:/data/app/::; s:-.*::')
-    if { grep -q '^inc$' $Config || match_test inc $pkgName; } \
+    if { grep -q '^inc$' $config || match_test inc $pkgName; } \
       && ! match_test exc $pkgName
     then
       $rsync -tu --inplace $Pkg "$apkBkps/$pkgName.apk"
@@ -91,7 +92,7 @@ bkp_appdata() {
           bkp_symlinks
         fi
       else
-        if { grep -q '^inc$' $Config || match_test inc $Pkg; } \
+        if { grep -q '^inc$' $config || match_test inc $Pkg; } \
           && ! match_test exc $Pkg
         then
           $rsync -Drtu --del \
@@ -127,14 +128,14 @@ backupd() {
     echo -en "\n(i) Backing up apps data..."
     bkp_appdata $1
   fi
-  if grep -q '^bkp ' $Config; then
+  if grep -q '^bkp ' $config; then
     set +u
     [ "$1" = ondemand ] && echo -en "\n(i) Backing up misc data..."
     set -u
     while true; do
       sed -n "s:^bkp:$rsync -rtu --inplace:p" \
-        $Config >$tmpDir/backupd
-      source $tmpDir/backupd
+        $config >$tmpDir/backupd
+      . $tmpDir/backupd
       set +u
       # the extra hour prevents conflicts with bkp_appdata()
       [ "$1" = ondemand ] && break || sleep $((bkpFreq * 3600 + 3600))
@@ -171,7 +172,7 @@ restore_symlinks() {
 restore_on_boot() {
   local Pkg="" o=""
   if ls -p $migratedData 2>/dev/null | grep -q / \
-    && ! grep -q '^noauto' $Config
+    && ! grep -q '^noauto' $config
   then
     set +eo pipefail
     wait_booted
@@ -229,7 +230,7 @@ retry_failed_restores() {
 #$2=pkgName
 match_test() {
   local p=""
-  for p in $(sed -n "s/^$1 //p" $Config); do
+  for p in $(sed -n "s/^$1 //p" $config); do
     echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || true
   done
   return 1

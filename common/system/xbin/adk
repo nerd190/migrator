@@ -4,31 +4,22 @@
 # License: GPL v3+
 
 
-# shell behavior
-set -o errexit # set -e
-set -o nounset # set -u
-set -o pipefail
-#set -o xtrace # set -x
-#IFS=$'\n\t' # new line & tab
-umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
+[ -e /sbin/.magisk/busybox ] \
+  && PATH=/sbin/.magisk/busybox:$PATH \
+  || PATH=/sbin/.core/busybox:$PATH
 
-modId=adk
-modData=/data/media/$modId
-Config=$modData/config.txt
-logsDir=$modData/logs
-logFile=$logsDir/wizard.log
-oldLog=$logFile.old
+logFile=/data/media/adk/logs/wizard.log
 
-# prepend Magisk's busybox to PATH
-PATH=/sbin/.core/busybox:$PATH
 
-# log engine
-mkdir -p $logsDir
-[ -f "$logFile" ] && mv $logFile $oldLog
-set +u
-[ -n "$EPOCHREALTIME" ] && PS4='[$EPOCHREALTIME] '
-set -u
-set -o xtrace 2>>$logFile # set -x
+set -euo pipefail
+umask 000
+
+
+# log
+mkdir -p ${logFile%/*}
+[ -f $logFile ] && mv $logFile $logFile.old
+set -x 2>>$logFile
+
 
 # exit trap (debugging tool)
 debug_exit() {
@@ -43,14 +34,15 @@ debug_exit() {
 } 1>>$logFile 2>&1
 trap debug_exit EXIT
 
-# find modPath
-modPath=$(sed -n 's/^.*MOUNTPATH=//p' /data/adb/magisk/util_functions.sh)/$modId
-[ -f $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
 
-source $modPath/core.sh # load core
+# set modPath
+modPath=/sbin/.magisk/img/adk
+[ -e $modPath/module.prop ] || modPath=/sbin/.core/img/adk
+[ -e $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
+. $modPath/core.sh # load core
 
 
-# Remove all backups of uninstalled apps
+# Remove backups of uninstalled apps
 rm_uninstalled() {
   local Pkg=""
   bkps_path

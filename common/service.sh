@@ -1,51 +1,39 @@
 #!/system/bin/sh
-# App Data Keeper (adk) backupd starter
+# App Data Keeper Daemon (adkd) Starter
 # Copyright (C) 2018, VR25 @ xda-developers
-# License: GPL v3+
+# License: GPL V3+
 
 
-# shell behavior
-set -o errexit # set -e
-set -o nounset # set -u
-set -o pipefail
-#set -o xtrace # set -x
-#IFS=$'\n\t' # new line & tab
-umask 000 # default perms (d=rwx-rwx-rwx, f=rw-rw-rw)
+(modPath=${0%/*}
+logFile=/data/media/adk/logs/main.log
 
 
-main() {
+set -euo pipefail
+umask 000
 
-  modId=adk
-  modPath=${0%/*}
-  modData=/data/media/$modId
-  logsDir=$modData/logs
-  logFile=$logsDir/main.log
-  oldLog=$logFile.old
 
-  # log engine
-  mkdir -p $logsDir
-  [ -f "$logFile" ] && mv $logFile $oldLog
-  set +u
-  [ -n "$EPOCHREALTIME" ] && PS4='[$EPOCHREALTIME] '
-  set -u
-  exec 1>>$logFile 2>&1
-  set -o xtrace # set -x
+# wait until /data is decrypted
+until [ -e /data/media/0/Android ]; do sleep 5; done
 
-  # exit trap (debugging tool)
-  debug_exit() {
-    echo -e "\n***EXIT $?***\n"
-    set +euxo pipefail
-    getprop | grep -Ei 'product|version'
-    echo
-    set
-    echo
-    echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
-      | sed 's/En/en/;s/Pe/pe/'
-  }
-  trap debug_exit EXIT
 
-  source $modPath/core.sh # load core
-  backupd # pseudo-daemon
+# log
+mkdir -p ${logFile%/*}
+[ -f $logFile ] && mv $logFile $logFile.old
+exec 1>>$logFile 2>&1
+set -x
+
+# exit trap (debugging tool)
+debug_exit() {
+  echo -e "\n***EXIT $?***\n"
+  set +euxo pipefail
+  getprop | grep -Ei 'product|version'
+  echo
+  set
+  echo
+  echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
+    | sed 's/En/en/;s/Pe/pe/'
 }
+trap debug_exit EXIT
 
-(main) &
+. $modPath/core.sh
+backupd &) &

@@ -1,6 +1,7 @@
 # App Data Keeper (adk)
 ## Copyright (C) 2018, VR25 @ xda-developers
 ### License: GPL v3+
+#### README.md
 
 
 
@@ -9,25 +10,23 @@
 
 This software is provided as is, in the hope that it will be useful, but without any warranty. Always read/reread this reference prior to installing/upgrading. While no cats have been harmed, I assume no responsibility under anything which might go wrong due to the use/misuse of it.
 
-A copy of the GNU General Public License, version 3 or newer ships with every build. Please, read it prior to using, modifying and/or sharing any part of this work.
+A copy of the GNU General Public License, version 3 or newer ships with every build. Please, study it prior to using, modifying and/or sharing any part of this work.
 
-To prevent fraud, DO NOT mirror any link associated with this project.
+To prevent fraud, DO NOT mirror any link associated with this project; DO NOT share ready-to-flash-builds (zips) on-line!
 
 
 
 ---
 #### DESCRIPTION
 
-This module protects select apps+data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of effort necessary for setting up a new system.
-
-Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities.
+This module protects select apps+data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of effort necessary for setting up a new system. It is also a full backup solution, thanks to rsync and OpenSSH capabilities.
 
 
 
 ---
 #### PRE-REQUISITES
 
-- Magisk v15+
+- Magisk 15.0+
 - Terminal emulator
 
 
@@ -36,7 +35,7 @@ Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabil
 #### CONFIG
 
 
-Config file: /data/media/adk/config.txt
+Path: /data/media/adk/config.txt
 
 
 SYNTAX
@@ -65,7 +64,7 @@ SYNTAX
 
     For rsync-specific details, refer to its man page.
 
-  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img and magis_mount/) after apps+data migration (untested on encrypted data)
+  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|bluedroid/vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img and magis_mount/) after apps+data migration (untested on encrypted data)
 
       wipe
 
@@ -137,7 +136,7 @@ NOTES/TIPS
 
   Updated system apps are treated as user apps.
 
-  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|vold/|wifi/), ssh/, system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/(magisk.*img|magisk_mount/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
+  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/(magisk.*img|magisk_mount/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
 
 
 DEFAULT CONFIG
@@ -202,13 +201,20 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 #### LINKS
 
 - [Facebook Support Page](https://facebook.com/VR25-at-xda-developers-258150974794782)
-- [Git Repository](https://github.com/Magisk-Modules-Repo/App-Data-Keeper)
+- [Git Repository](https://github.com/Magisk-Modules-Repo/adk)
 - [XDA Thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278)
 
 
 
 ---
 #### LATEST CHANGES
+
+**2018.12.25 (201812250)**
+- [adkd] Pause execution until /data is decrypted
+- [General] Fixes and optimizations
+- [General] Magisk 18 support
+- [Misc] Updated building and debugging tools
+- ["wipe"] Preserve Bluetooth settings
 
 **2018.9.22 (201809220)**
 - Exclude $modData and <external storage>/$MODID from media scan.
@@ -222,10 +228,3 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 - Performance and reliability improvements
 - Suppress irrelevant 'ln -s' error messages.
 - Wizard, 3 -- option to choose whether already installed apps should be filtered out.
-
-**2018.9.14 (201809140)**
-- Added support for odd package suffixes (/data/app/pkgName<suffix>) causing apps+data backup/restore to fail.
-- Fixed 'noauto config keyword not being properly recognized'.
-- On nonzero exit code, revert changes to the recovery environment and don't leave magisk image mounted.
-- Save \$Pkg symlinks to \$appDataBkps/\$Pkg.lns (formerly \$appDataBkps/\$Pkg/symlinks.list) for faster rsync update checks (faster incremental apps data backups).
-- The dedicated factory reset mechanism wipes /cache as well, exc. magisk.*img (for compat. with 'f2fsfix' module) and magisk_mount/.
