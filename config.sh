@@ -31,7 +31,7 @@ PROPFILE=false
 POSTFSDATA=false
 
 # Set to true if you need late_start service script
-LATESTARTSERVICE=false
+LATESTARTSERVICE=true
 
 ##########################################################################################
 # Installation Message
@@ -89,7 +89,7 @@ set_permissions() {
   set_perm_recursive  $MODPATH  0  0  0755  0644
 
   # Permissions for executables
-  for f in $MODPATH/bin/* $MODPATH/system/bin/* $MODPATH/system/xbin/* $MODPATH/*.sh; do
+  for f in $MODPATH/bin/* $MODPATH/system/*bin/* $MODPATH/*.sh; do
     [ -f "$f" ] && set_perm $f  0  0  0755
   done
 }
@@ -105,234 +105,17 @@ set_permissions() {
 # Make update-binary as clean as possible, try to only do function calls in it.
 
 
-# exit trap (debugging tool)
-debug_exit() {
-  local e=$?
-  echo -e "\n***EXIT $e***\n"
-  set +euxo pipefail
-  set
-  echo
-  echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
-    | sed 's/En/en/;s/Pe/pe/'
-  exxit $e $e >/dev/null 2>&1
-} >&2
-trap debug_exit EXIT
+trap 'exxit $? $? 1>/dev/null 2>&1' EXIT
 
 
 install_module() {
-
-  prep_environment
-
-  # force reinstall if file exists (debugging)
-  [ -f /data/.$MODID ] || factory_reset_or_uninstall
-
-  # block direct legacy upgrade
-  if [ "$curVer" -lt 201809130 -a "$curVer" -ne 0 ] \
-    && ls $modData/.appData $modData/appdata 2>/dev/null | grep -q .
-  then
-    ui_print " "
-    ui_print "(!) Detected legacy version installed!"
-    ui_print "- Apps data must be migrated."
-    ui_print "- Uninstall $MODID AND reboot into system first."
-    ui_print " "
-    exxit 1
-  fi
-
-  # create module paths
-  rm -rf $MODPATH 2>/dev/null || true
-  mkdir -p $MODPATH/bin $modInfo
-
-  # extract module files
-  ui_print "- Extracting module files"
-  unzip -o "$ZIP" -d $INSTALLER >&2
-  cd $INSTALLER
-  mv bin/rsync_$binArch $MODPATH/bin/rsync
-  mv common/* $MODPATH/
-  [ -d /system/xbin ] || mv $MODPATH/system/xbin $MODPATH/system/bin
-  mv -f License* README* $modInfo/
-  cp $MODPATH/config.txt $MODPATH/default_config.txt
-
-  # update config & remove obsolete files
-  if [ "$curVer" -lt 201809130 ]; then
-    cp -f $MODPATH/config.txt $Config
-    rm $modData/logs/* \
-      $MOUNTPATH0/.core/post-fs-data.d/$MODID.sh \
-      $MOUNTPATH0/.core/service.d/$MODID.sh 2>/dev/null || true
-  fi
-
-  # set default config if $Config is missing
-  [ -f "$Config" ] && rm $MODPATH/config.txt \
-    || mv $MODPATH/config.txt $Config
-
-  [ -f /data/.$MODID ] && rm /data/.$MODID
-  set +euxo pipefail
-}
-
-
-migrate_bkps() {
-  if [ -d "$iBkps" ]; then
-    rm -rf $iBkps.old || true
-    mv $iBkps $iBkps.old
-  fi
-  if [ -d "$eBkps" ]; then
-    rm -rf $eBkps.old || true
-    mv $eBkps $eBkps.old
-  fi
-} 2>/dev/null
-
-
-exxit() {
-  set +euxo pipefail
-  if [ "$2" -ne 0 ]; then
-    unmount_magisk_img
-    $BOOTMODE || recovery_cleanup
-    set -u
-    rm -rf $TMPDIR
-  fi
-  exit $1
-}
-
-
-factory_reset_or_uninstall() {
-  local d="" e=""
-  if [ "$curVer" -eq "$(i versionCode)" ]; then
-    if $BOOTMODE; then
-      touch $MOUNTPATH0/$MODID/remove
-      ui_print " "
-      ui_print "(i) $MODID will be removed at next boot."
-
-    else
-      grep -q '^noauto' $Config 2>/dev/null || migrate_data
-
-      # wipe data
-      if grep -q '^wipe$' $Config 2>/dev/null; then
-        ui_print " "
-        ui_print "(i) Wiping /data (exc. adb/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img & magisk_mount/)..."
-
-        for e in $(ls -1A /data 2>/dev/null \
-          | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
-        do
-          (rm -rf /data/$e) &
-        done
-
-        for e in $(ls -1A /data/data 2>/dev/null \
-          | grep -Ev 'provider' 2>/dev/null)
-        do
-          (rm -rf /data/data/$e) &
-        done
-
-        for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
-        do
-          (rm -rf /data/misc/$e) &
-        done
-
-        for e in $(ls -1A /data/system* 2>/dev/null \
-          | grep -Ev '^/.*:$|^0$|^sync$|^storage.xml$|^users$' 2>/dev/null)
-        do
-          (rm -rf /data/system*/$e 2>/dev/null) &
-        done
-
-        for e in $(ls -1A /data/system/sync 2>/dev/null \
-          | grep -v '^accounts.xml$' 2>/dev/null)
-        do
-          (rm -rf /data/system/sync/$e) &
-        done
-
-        for e in $(ls -1A /data/system*/0 2>/dev/null \
-          | grep -Ev '^/.*:$|^accounts.*db$|^accounts.*al$' 2>/dev/null)
-        do
-          (rm -rf /data/system*/0/$e 2>/dev/null) &
-        done
-
-        for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
-          (rm -rf $d) &
-        done
-
-        if mount -o remount,rw /cache 2>/dev/null; then
-          for e in $(ls -1A /cache 2>/dev/null | grep -Ev '^magisk.*img$|^magisk_mount$' 2>/dev/null); do
-            (rm -rf /cache/$e) &
-          done
-        fi
-
-        wait
-        ui_print "- Done."
-      fi
-
-      ui_print "- You apps+data will be automatically restored shortly after boot."
-    fi
-    ui_print " "
-    exxit 0
-  fi
-}
-
-
-find_sdcard() {
-  local d="" Size=0 newSize=0
-  if grep -q '/mnt/media_rw' /proc/mounts; then
-    for d in /mnt/media_rw/*; do
-      newSize=$(df "$d" | tail -n 1 | awk '{print $2}')
-      if [ "$newSize" -gt "$Size" ]; then
-        Size=$newSize
-        externalStorage="$d"
-      fi
-    done
-  fi
-}
-
-
-migrate_data() {
-  local Pkg=""
-  if grep -Eq '^inc$|^inc ' $Config 2>/dev/null; then
-    ui_print " "
-    ui_print "(i) Migrating data..."
-    set +e
-    { rm -rf $failedRes.old $migratedData.old
-    mv $failedRes $failedRes.old
-    mv $migratedData $migratedData.old; } 2>/dev/null
-    set -e
-    awk '{print $1}' $pkgList | \
-      while read Pkg; do
-        (Pkg=$Pkg # make sure value doesn't change until subshell exits
-        if ! ls -p /data/app/$Pkg* 2>/dev/null | grep -q /; then
-          # system app
-          match_test inc $Pkg && migrate_apk_plus_data
-        else
-          # treat as user app
-          if { grep -q '^inc$' $Config || match_test inc $Pkg; } \
-            && ! match_test exc $Pkg
-          then
-            migrate_apk_plus_data
-          fi
-        fi) &
-      done
-    migrate_bkps
-    wait
-    ui_print "- Done."
-  fi
-}
-
-
-# migrate APKs and respective data to $migratedData
-migrate_apk_plus_data() {
-  mkdir -p $migratedData $migratedData
-  bkp_symlinks
-  mv /data/data/$Pkg $migratedData/
-  set +eo pipefail
-  mv $(find /data/app/$Pkg* type f -name base.apk 2>/dev/null | head -n 1) \
-    $migratedData/$Pkg.apk 2>/dev/null
-  set -eo pipefail
-}
-
-
-prep_environment() {
 
   set -euxo pipefail
 
   modData=/data/media/$MODID
   migratedData=$modData/migrated_data
-  Config=$modData/config.txt
+  config=$modData/config.txt
   modInfo=$modData/info
-  utilFunc=$MAGISKBIN/util_functions.sh
   magiskVer=${MAGISK_VER/.}
   pkgList=/data/system/packages.list
   externalStorage=/external_sd
@@ -343,13 +126,13 @@ prep_environment() {
   if $BOOTMODE; then
     find_sdcard
     MOUNTPATH0=/sbin/.magisk/img
-    [ -e $MOUNTPATH0 ] || MOUNTPATH0=/sbin/.core/img
+    [ -d $MOUNTPATH0 ] || MOUNTPATH0=/sbin/.core/img
   fi
 
   iBkps=$modData/backups
   eBkps=$externalStorage/$MODID/backups
 
-  curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || true)
+  curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || :)
   [ -z "$curVer" ] && curVer=0
 
   # get CPU arch
@@ -361,6 +144,177 @@ prep_environment() {
        ui_print " "
        exxit 1;;
   esac
+
+  [ ! -f /data/.migrator ] && ! $BOOTMODE && factory_reset
+
+  # create module paths
+  rm -rf $MODPATH 2>/dev/null || :
+  mkdir -p $MODPATH/bin $modInfo
+
+  # extract module files
+  ui_print "- Extracting module files"
+  unzip -o "$ZIP" -d $INSTALLER >&2
+  cd $INSTALLER
+  mv bin/rsync_$binArch $MODPATH/bin/rsync
+  mv common/* $MODPATH/
+  $LATESTARTSERVICE || rm $MODPATH/service.sh
+  [ -d /system/xbin ] || mv $MODPATH/system/xbin $MODPATH/system/bin
+  mv -f License* README* $modInfo/
+  mv $MODPATH/config.txt $MODPATH/default_config.txt
+
+  # set default config
+  if [ ! -f $config ] || [ $curVer -lt 201901310 ]; then
+    cp -f $MODPATH/default_config.txt $config
+  fi
+
+  [ -f /data/.migrator ] && rm /data/.migrator
+  set +euxo pipefail
+}
+
+
+migrate_bkps() {
+  if [ -d "$iBkps" ]; then
+    rm -rf $iBkps.old || :
+    mv $iBkps $iBkps.old
+  fi
+  if [ -d "$eBkps" ]; then
+    rm -rf $eBkps.old || :
+    mv $eBkps $eBkps.old
+  fi
+} 2>/dev/null
+
+
+exxit() {
+  set +euxo pipefail
+  if [ "x$2" != x0 ]; then
+    unmount_magisk_img
+    $BOOTMODE || recovery_cleanup
+    set -u
+    rm -rf $TMPDIR
+  fi
+  exit $1
+}
+
+
+factory_reset() {
+  local d="" e=""
+  if [ $curVer -eq $(i versionCode) ]; then
+    grep -iq '^noauto' $config 2>/dev/null || migrate_data
+
+    # wipe data
+    if ! grep -iq '^nowipe' $config 2>/dev/null; then
+      ui_print " "
+      ui_print "(i) Wiping data, excluding adb/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache/magisk*img.."
+
+      for e in $(ls -1A /data 2>/dev/null \
+        | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
+      do
+        (rm -rf /data/$e) &
+      done
+
+      for e in $(ls -1A /data/data 2>/dev/null \
+        | grep -Ev 'provider' 2>/dev/null)
+      do
+        (rm -rf /data/data/$e) &
+      done
+
+      for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
+      do
+        (rm -rf /data/misc/$e) &
+      done
+
+      for e in $(ls -1A /data/system* 2>/dev/null \
+        | grep -Ev '^/.*:$|^0$|^sync$|^storage.xml$|^users$' 2>/dev/null)
+      do
+        (rm -rf /data/system*/$e 2>/dev/null) &
+      done
+
+      for e in $(ls -1A /data/system/sync 2>/dev/null \
+        | grep -v '^accounts.xml$' 2>/dev/null)
+      do
+        (rm -rf /data/system/sync/$e) &
+      done
+
+      for e in $(ls -1A /data/system*/0 2>/dev/null \
+        | grep -Ev '^/.*:$|^accounts.*db$|^accounts.*al$' 2>/dev/null)
+      do
+        (rm -rf /data/system*/0/$e 2>/dev/null) &
+      done
+
+      for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
+        (rm -rf $d) &
+      done
+
+      if mount -o remount,rw /cache 2>/dev/null; then
+        for e in $(ls -1A /cache 2>/dev/null | grep -v '^magisk*img$' 2>/dev/null); do
+          (rm -rf /cache/$e) &
+        done
+      fi
+
+      wait
+    fi
+    ui_print " "
+    exxit 0
+  fi
+}
+
+
+find_sdcard() {
+  local d="" size=0 newSize=0
+  if grep -q '/mnt/media_rw' /proc/mounts; then
+    for d in /mnt/media_rw/*; do
+      newSize=$(df "$d" | tail -n 1 | awk '{print $2}')
+      if [ "$newSize" -gt "$size" ]; then
+        size=$newSize
+        externalStorage="$d"
+      fi
+    done
+  fi
+}
+
+
+migrate_data() {
+  local pkg=""
+  if grep -q '^inc' $config 2>/dev/null; then
+    ui_print " "
+    ui_print "(i) Migrating apps.."
+    set +e
+    { rm -rf $failedRes.old $migratedData.old
+    mv $failedRes $failedRes.old
+    mv $migratedData $migratedData.old; } 2>/dev/null
+    set -e
+    awk '{print $1}' $pkgList | \
+      while read pkg; do
+        (pkg=$pkg # make sure value doesn't change until subshell exits
+        if ! ls -p /data/app/$pkg* 2>/dev/null | grep -q /; then
+          # system app
+          match_test inc $pkg && migrate_apk_plus_data
+        else
+          # user app
+          if { grep -q '^inc$' $config || match_test inc $pkg; } \
+            && ! match_test exc $pkg \
+            && ! grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'
+          then
+            migrate_apk_plus_data
+          fi
+        fi) &
+      done
+    migrate_bkps
+    wait
+  fi
+}
+
+
+# migrate APKs and respective data to $migratedData
+migrate_apk_plus_data() {
+  mkdir -p $migratedData $migratedData
+  bkp_symlinks
+  mv /data/data/$pkg $migratedData/
+  set +eo pipefail
+  grep $pkg /data/system/packages.xml | grep -q '/system/.*app/' \
+    || mv $(find /data/app/$pkg* type f -name base.apk 2>/dev/null | head -n 1) \
+      $migratedData/$pkg.apk 2>/dev/null
+  set -eo pipefail
 }
 
 
@@ -368,32 +322,26 @@ prep_environment() {
 #$2=pkgName
 match_test() {
   local p=""
-  for p in $(sed -n "s/^$1 //p" $Config); do
-    echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || true
+  for p in $(sed -n "s/^$1 //p" $config); do
+    echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || :
   done
   return 1
 }
 
 
 bkp_symlinks() {
-  local l="" lns=$migratedData/$Pkg.lns
+  local l="" lns=$migratedData/$pkg.lns
   : >$lns
-  for l in $(find /data/data/$Pkg -type l); do
-    echo "$(readlink -f $l | sed "s:$Pkg.*/lib/[^/]*:$Pkg\*/lib/\*:; s:$Pkg.*/lib/:$Pkg\*/lib/:") $l" >>$lns
+  for l in $(find /data/data/$pkg -type l); do
+    echo "$(readlink -f $l | sed "s:$pkg.*/lib/[^/]*:$pkg\*/lib/\*:; s:$pkg.*/lib/:$pkg\*/lib/:") $l" >>$lns
   done
   grep -q '^/' $lns || rm $lns
 }
 
 
 version_info() {
-
-  local c="" whatsNew="- [adkd] Pause execution until /data is decrypted
-- [General] Fixes and optimizations
-- [General] Magisk 18 support
-- [Misc] Updated building and debugging tools
-- [\"wipe\"] Preserve Bluetooth settings"
-
-  set -euo pipefail
+  local line=""
+  local println=false
 
   # a note on untested Magisk versions
   if [ ${MAGISK_VER/.} -gt 180 ]; then
@@ -404,20 +352,20 @@ version_info() {
 
   ui_print " "
   ui_print "  WHAT'S NEW"
-  echo "$whatsNew" | \
-    while read c; do
-      ui_print "    $c"
-    done
-  # Install note
-  if [ "$curVer" -lt 201809130 ]; then
-    ui_print " "
-    ui_print "  Install note: $Config was overwritten (new info)."
-  fi
+  cat ${config%/*}/info/README.md | while read line; do
+    echo "$line" | grep -q '\*\*.*\(.*\)\*\*' && println=true
+    $println && echo "$line" | grep -q '^$' && break
+    #$println && ui_print "$(echo "    $line" | grep -v '\*\*.*\(.*\)\*\*')"
+    $println && echo "    $line" | grep -v '\*\*.*\(.*\)\*\*' >> /proc/self/fd/$OUTFD
+  done
   ui_print " "
 
   ui_print "  LINKS"
-  ui_print "    - Facebook Page: facebook.com/VR25-at-xda-developers-258150974794782"
-  ui_print "    - Git Repository: github.com/Magisk-Modules-Repo/adk"
-  ui_print "    - XDA Thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278"
+  ui_print "    - Donation: https://paypal.me/vr25xda/"
+  ui_print "    - Facebook page: facebook.com/VR25-at-xda-developers-258150974794782/"
+  ui_print "    - Git repository: github.com/Magisk-Modules-Repo/adk/"
+  ui_print "    - Telegram channel: t.me/vr25_xda/"
+  ui_print "    - Telegram profile: t.me/vr25xda/"
+  ui_print "    - XDA thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278/"
   ui_print " "
 }

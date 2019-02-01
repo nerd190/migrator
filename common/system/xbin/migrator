@@ -1,65 +1,53 @@
 #!/system/bin/sh
-# App Data Keeper (adk) wizard
-# Copyright (C) 2018, VR25 @ xda-developers
-# License: GPL v3+
+# Migrator Wizard
+# Copyright (C) 2018-2019, VR25 @ xda-developers
+# License: GPL V3+
 
 
-[ -e /sbin/.magisk/busybox ] \
+[ -d /sbin/.magisk/busybox ] \
   && PATH=/sbin/.magisk/busybox:$PATH \
   || PATH=/sbin/.core/busybox:$PATH
 
-logFile=/data/media/adk/logs/wizard.log
+log=/data/media/adk/logs/wizard.log
 
 
+umask 0
 set -euo pipefail
-umask 000
 
 
 # log
-mkdir -p ${logFile%/*}
-[ -f $logFile ] && mv $logFile $logFile.old
-set -x 2>>$logFile
-
-
-# exit trap (debugging tool)
-debug_exit() {
-  echo -e "\n***EXIT $?***\n"
-  set +euxo pipefail
-  getprop | grep -Ei 'product|version'
-  echo
-  set
-  echo
-  echo "SELinux status: $(getenforce 2>/dev/null || sestatus 2>/dev/null)" \
-    | sed 's/En/en/;s/Pe/pe/'
-} 1>>$logFile 2>&1
-trap debug_exit EXIT
+if [ -f /data/media/adk/verbose ]; then
+  mkdir -p ${log%/*}
+  [ -f $log ] && grep -q .. $log && mv $log $log.old
+  set -x 2>>$log
+  trap 'rm /data/media/adk/verbose 2>/dev/null' EXIT
+fi
 
 
 # set modPath
 modPath=/sbin/.magisk/img/adk
-[ -e $modPath/module.prop ] || modPath=/sbin/.core/img/adk
-[ -e $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
+[ -f $modPath/module.prop ] || modPath=/sbin/.core/img/adk
+[ -f $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
 . $modPath/core.sh # load core
 
 
 # Remove backups of uninstalled apps
 rm_uninstalled() {
-  local Pkg=""
+  local pkg=""
   bkps_path
   if ls -p $appDataBkps 2>/dev/null | grep -q /; then
     mk_list not_installed
     if grep -q '[a-z]' $tmpDir/pkg_list0; then
       regex_prompt
       if grep -q '[a-z]' $tmpDir/pkg_list; then
-        echo -e "\n(i) Removing..."
-        for Pkg in $(cat $tmpDir/pkg_list); do
-          echo "- $Pkg"
-          [ -f "$apkBkps/$Pkg" ] && rm "$apkBkps/$Pkg"
-          [ -d "$appDataBkps/$Pkg" ] && rm -rf "$appDataBkps/$Pkg"
+        echo -e "\n(i) Removing.."
+        for pkg in $(cat $tmpDir/pkg_list); do
+          echo "- $pkg"
+          rm -rf $apkBkps/$pkg.apk $appDataBkps/$pkg 2>/dev/null
         done
         echo
       else
-        no_matches rm_uninstalled
+        no_match rm_uninstalled
       fi
     else
       echo -e "(i) Nothing to remove\n"
@@ -92,30 +80,30 @@ rsync_util() {
 
 
 restore_apps() {
-  local Pkg=""
+  local pkg=""
   bkps_path
   if ls $apkBkps 2>/dev/null | grep -q .apk; then
     : >$tmpDir/pkg_list0
-    for Pkg in $(ls -1 $apkBkps); do
-      echo "- $Pkg"
-      echo $Pkg >>$tmpDir/pkg_list0
+    for pkg in $(ls -1 $apkBkps); do
+      echo "- $pkg"
+      echo $pkg >>$tmpDir/pkg_list0
     done
     regex_prompt
     if grep -q '[a-z]' $tmpDir/pkg_list; then
-      echo -e "\n[Re]installing..."
-      Pkg=""
-      for Pkg in $(cat $tmpDir/pkg_list); do
-        echo -n "- $Pkg"
-        if grep -q "${Pkg%.apk}" "$pkgList"; then
-          pm install -r "$apkBkps/$Pkg" 1>/dev/null || true
+      echo -e "\n[Re]installing.."
+      pkg=""
+      for pkg in $(cat $tmpDir/pkg_list); do
+        echo -n "- $pkg"
+        if grep -q "${pkg%.apk}" "$pkgList"; then
+          pm install -r "$apkBkps/$pkg" 1>/dev/null || :
         else
-          pm install "$apkBkps/$Pkg" 1>/dev/null || true
+          pm install "$apkBkps/$pkg" 1>/dev/null || :
         fi
         echo
       done
       post_restore apps apps
     else
-      no_matches restore_apps
+      no_match restore_apps
     fi
   else
     missing_bkp
@@ -131,7 +119,7 @@ restore_data() {
     if grep -q '[a-z]' $tmpDir/pkg_list; then
       restore data data
     else
-      no_matches restore_data
+      no_match restore_data
     fi
   else
     missing_bkp
@@ -140,7 +128,7 @@ restore_data() {
 
 
 restore_apps_and_data() {
-  local o="" Pkg=""
+  local o="" pkg=""
   bkps_path
   if ls $appDataBkps 2>/dev/null | grep -q .; then
     echo -n "Filter out already installed apps? (Y/n) "
@@ -154,13 +142,13 @@ restore_apps_and_data() {
       o=""
       select o in Exit "Main menu" \
         "Restore apps (replace)" \
-        "Restore apps data (overwrite)"
+        "Restore data (overwrite)"
       do
         case $o in
           Exit) echo; exit 0;;
           "Main menu") wizard; break;;
           "Restore apps (replace)") reset; echo; restore_apps; break;;
-          "Restore apps data (overwrite)") reset; echo; restore_data; break;;
+          "Restore data (overwrite)") reset; echo; restore_data; break;;
         esac
       done
     fi
@@ -169,7 +157,7 @@ restore_apps_and_data() {
     if grep -q '[a-z]' $tmpDir/pkg_list; then
       restore apps+data apps_and_data
     else
-      no_matches restore_apps_and_data
+      no_match restore_apps_and_data
     fi
   else
     missing_bkp
@@ -183,14 +171,14 @@ wizard() {
   reset
   cat <<ACTIONS
 
-App Data Keeper (adk) Wizard
+Migrator Wizard
 
 Restore
   1) Apps (replace)
   2) Data (overwrite)
   3) Apps+data
 Utilities
-  4) Test backupd()
+  4) Manual apps+data backup
   5) Debugging info
   6) rsync -hrtuv --inplace --progress --stats \$@
   7) Remove select backups of uninstalled apps
@@ -199,7 +187,7 @@ Utilities
 
 ACTIONS
 
-  echo -n "(i) Choose an option... "
+  echo -n "(i) Choose an option.. "
   read o
 
   case $o in
@@ -228,9 +216,9 @@ debug_info() {
 }
 
 
-no_matches() {
+no_match() {
   local o=""
-  echo -e "\n(!) No match(es)!\n"
+  echo -e "\n(!) No match!\n"
   select o in Exit Retry "Main menu"; do
     case $o in
       Exit) echo; exit 0;;
@@ -265,51 +253,51 @@ regex_prompt() {
   local i=""
   : >$tmpDir/pkg_list
   echo
-  echo -n "(i) Input pattern(s) to match (i.e., sp.*fy or duk|faceb|whats. A dot matches all)... "
+  echo -n "(i) Type egrep pattern(s) (e.g., sp.*fy or duk|faceb|whats. A dot matches all) followed by <enter>.. "
   read i
-  [ -n "$i" ] && cat $tmpDir/pkg_list0 | grep -E "$i" 2>/dev/null >$tmpDir/pkg_list || true
+  [ -n "$i" ] && cat $tmpDir/pkg_list0 | grep -E "$i" 2>/dev/null >$tmpDir/pkg_list || :
 }
 
 
 mk_list() {
-  local Pkg="" Test=""
+  local pkg="" test=""
   : >$tmpDir/pkg_list0
-  for Pkg in $(find $appDataBkps -type d -maxdepth 1 \
+  for pkg in $(find $appDataBkps -type d -maxdepth 1 \
     | sed "s:$appDataBkps::; s:/::")
   do
     case "$1" in
-      not_installed) grep -q "$Pkg" "$pkgList" && Test=false || Test=true;;
-      installed) grep -q "$Pkg" "$pkgList" && Test=true || Test=false;;
-      all) Test=true;;
+      not_installed) grep -q "$pkg" "$pkgList" && test=false || test=true;;
+      installed) grep -q "$pkg" "$pkgList" && test=true || test=false;;
+      all) test=true;;
     esac
-    if $Test; then
-      echo "- $Pkg"
-      echo $Pkg >>$tmpDir/pkg_list0
+    if $test; then
+      echo "- $pkg"
+      echo $pkg >>$tmpDir/pkg_list0
     fi
   done
 }
 
 
 restore() {
-  local Pkg="" o=""
-  echo -e "\nRestoring $1..."
-  for Pkg in $(cat $tmpDir/pkg_list); do
-    echo -n "- $Pkg"
-    if [ "$1" = "apps+data" ]; then
-      if grep -q "$Pkg" "$pkgList"; then
-        pm install -r "$apkBkps/$Pkg.apk" 1>/dev/null || true
+  local pkg="" o=""
+  echo -e "\nRestoring $1.."
+  for pkg in $(cat $tmpDir/pkg_list); do
+    echo -n "- $pkg"
+    if [ "x$1" = xapps+data ]; then
+      if grep -q "$pkg" "$pkgList"; then
+        pm install -r "$apkBkps/$pkg.apk" 1>/dev/null || :
       else
-        pm install "$apkBkps/$Pkg.apk" 1>/dev/null || true
+        pm install "$apkBkps/$pkg.apk" 1>/dev/null || :
       fi
     fi
-    pm disable "$Pkg" 1>/dev/null || true
-    $rsync -Drt --del "$appDataBkps/$Pkg/" /data/data/$Pkg
+    pm disable "$pkg" 1>/dev/null || :
+    $rsync -Drt --del "$appDataBkps/$pkg/" /data/data/$pkg
     echo
-    restore_symlinks $appDataBkps/$Pkg.lns
-    o=$(grep "$Pkg" "$pkgList" | awk '{print $2}')
-    chown -R $o:$o /data/data/$Pkg 2>/dev/null || true
-    chmod -R 771 /data/data/$Pkg 2>/dev/null || true
-    pm enable "$Pkg" 1>/dev/null
+    restore_symlinks $appDataBkps/$pkg.lns
+    o=$(grep "$pkg" "$pkgList" | awk '{print $2}')
+    chown -R $o:$o /data/data/$pkg 2>/dev/null || :
+    chmod -R 771 /data/data/$pkg 2>/dev/null || :
+    pm enable "$pkg" 1>/dev/null
   done
   post_restore $1 $2
 }
@@ -328,7 +316,7 @@ exit_or_not() {
 
 bkps_path() {
   local o="" bkpsDir=${apkBkps%/*}
-  echo -e "Backups location...\n"
+  echo -e "Backups location..\n"
   select o in "$bkpsDir/ (default)" "$bkpsDir.old/" "<custom>" \
     "Return to main menu" Exit
   do

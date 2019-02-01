@@ -1,7 +1,7 @@
 id=adk
-name=App Data Keeper (adk)
-version=2018.12.25
-versionCode=201812250
+name=Migrator
+version=2019.2.1
+versionCode=201902010
 author=VR25 @ xda-developers
-description=This module protects select apps+data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of effort necessary for setting up a new system. Additionally, adk is a full backup solution, thanks to rsync and OpenSSH capabilities. Read the documentation (README.md) prior to installing/upgrading.
-minMagisk=1500
+description=This is a ROM migration utility. On the flip side, it is a full backup solution, thanks to rsync and OpenSSH capabilities.
+minMagisk=17000

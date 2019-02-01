@@ -1,6 +1,6 @@
-# App Data Keeper (adk)
-## Copyright (C) 2018, VR25 @ xda-developers
-### License: GPL v3+
+# Migrator - Android ROM Migration Utility
+## Copyright (C) 2018-2019, VR25 @ xda-developers
+### License: GPL V3+
 #### README.md
 
 
@@ -17,16 +17,22 @@ To prevent fraud, DO NOT mirror any link associated with this project; DO NOT sh
 
 
 ---
+#### INCLUDED SOFTWARE
+- rsync, copyright (C) 1996-2018, Andrew Tridgell, Wayne Davison, and others
+
+
+
+---
 #### DESCRIPTION
 
-This module protects select apps+data from being wiped out on a regular TWRP factory reset. Thus, greatly reducing the amount of effort necessary for setting up a new system. It is also a full backup solution, thanks to rsync and OpenSSH capabilities.
+This is a ROM migration utility. On the flip side, it is a full backup solution, thanks to rsync and OpenSSH capabilities.
 
 
 
 ---
 #### PRE-REQUISITES
 
-- Magisk 15.0+
+- Magisk 17.0+
 - Terminal emulator
 
 
@@ -34,122 +40,61 @@ This module protects select apps+data from being wiped out on a regular TWRP fac
 ---
 #### CONFIG
 
+*Basic*
 
-Path: /data/media/adk/config.txt
+bkpFreq=8 -- Incremental backup frequency in hours (value must be an integer, default: 8)
 
+inc <egrep pattern> -- Include packages in migrations and backups. If <package name> is not specified, all user apps are included. e.g., `inc sp.*fy|faceb`
 
-SYNTAX
+exc <egrep pattern> -- Exclude packages from migrations and backups. e.g., `exc google`
 
-  Incremental apps data backup frequency in hours (value must be an integer, default: 8)
+noauto -- Do not migrate/auto-restore apps.
 
-      bkpFreq=8
+nowipe -- Do not auto-wipe /data and /cache. Note that this also means extra data (e.g., system settings, Magisk modules) won't be preserved.
 
-  Include all user and *updated* system apps
+*Advanced*
 
-      inc
+bkp <extra rsync option(s)> <source(s)> <destination> -- Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
 
-  Include pkgName (this works for any app, and it's the only way to *include non-update-able system apps*)
+Tip: use $i for internal storage and $e for external media (largest partition) as opposed to writing full paths.
 
-      inc pkgName
+For rsync-specific details, refer to rsync's man page.
 
-  Exclude *user* app (overrides "inc" and "inc pkgName")
+*Examples (advanced)*
 
-      exc pkgName
+Full internal storages backup
+- bkp --del $i/ $e/full_internal_bkp
 
-  Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
+Backup a few internal folders to external storage
+- bkp --del $i/Download $i/Dukto $e/important_data
 
-      bkp <extra rsync option(s)> <SOURCE(s)> <DEST>
+Backup data to a remote machine
+- bkp -e "ssh -i <path to ssh key>" <source(s)> user@host:/<destination>
 
-    Tip: use $i for internal storage and $e for external media (largest partition) as opposed to writing full paths.
+Backup backed up apps and respective data to a remote machine
+- bkp -e "ssh -i <path to ssh key>" $appBkps $appdataBkps user@host:/<destination>
 
-    For rsync-specific details, refer to its man page.
-
-  Wipe /data (exc. adb/, data/.*provider.*/, media/, misc/(adb/|bluedroid/vold/|wifi/), ssh/ and system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache (exc. magisk.*img and magis_mount/) after apps+data migration (untested on encrypted data)
-
-      wipe
-
-  Do not migrate/auto-restore apps+data
-
-      noauto
-
-
-EXAMPLES
-
-  App data protection setups
-
-    All user and *updated* system apps, except Spotify
-
-      inc
-
-      exc com.spotify music
-
-    Only stock apps matching "mail" (non-update-able)
-
-      inc mail
-
-    Stock terminal, plus all user & *updated* system apps, except Spotify
-
-      inc
-
-      inc term
-
-      exc com.spotify.music
-
-    All user and *updated* system apps, except *updated* Google Play Services
-
-      inc
-
-      exc com.google.android.gms
-
-  Backup setups
-
-    Full internal storage
-
-      bkp --del $i/ $e/full_internal_bkp
-
-    Specific data
-
-      bkp --del $i/Download $i/Dukto $e/important_data
-
-    Some data to some remote machine
-
-      bkp -e "ssh -i /path/to/key" SOURCE user@host:/DESTINATION
-
-    Sync all backed up apps and respective data to a remote machine
-
-      bkp -e "ssh -i /path/to/ssh/key" $appBkps $appdataBkps user@host:/DESTINATION
-
-
-NOTES/TIPS
-
-  A bare "inc" affects user and updated system apps only.
-
-  An empty/null config disables all features.
-
-  Any line containing leading and/or trailing pounds/spaces and/or any other additional characters is ignored.
-
-  Instead of having multiple inc/exc lines, globbing/regex patterns can be used to match multiple packages (i.e., "exc google", "inc sp.*fy|ctionary|mail", without quotes).
-
-  Only inc'd (included) apps are backed up.
-
-  The word "provider" matches all packages which store/provide contacts, SMSs/MMSs, call logs, etc..
-
-  Updated system apps are treated as user apps.
-
-  When the "wipe" feature is enabled, adb/, data/.*provider.*/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system(""|.*)/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/(magisk.*img|magisk_mount/) also survive factory resets. Note that all Magisk modules are preserved across adk factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus,it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
-
-
-DEFAULT CONFIG
-
+*Default Configuration*
+`
 inc
+bkpFreq=8
 inc term|provider
+`
+
+
+---
+#### NOTES/TIPS
+
+The word "provider" matches packages that store/provide contacts, SMSs/MMSs, call logs, etc..
+
+Migrated data includes adb/, data/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/magisk*img.
 
 
 
 ---
 #### TERMINAL
 
-Running `adk` as root launches "adk wizard". Included options are incremental backups, data restore and more.
+Running `migrator` as root launches a wizard. Included options are incremental backups, data restore and more.
 
 
 
@@ -157,57 +102,71 @@ Running `adk` as root launches "adk wizard". Included options are incremental ba
 #### SETUP STEPS
 
 - Install
-1. Flash the zip from Magisk Manager or TWRP.
+1. Flash the zip from Magisk Manager or custom recovery.
 2. Reboot.
 3. Customize config.txt (optional).
 
 - Uninstall
-1. Reflash the same version from Magisk Manager or use Magisk Manager for Recovery Mode or use the Magisk Manager app itself.
+1. Use Magisk Manager (app) or Magisk Manager for Recovery Mode (utility).
 2. Reboot.
 3. Remove /data/media/adk and/or <external storage>/adk (optional).
 
 - Factory reset
-1. Reflash the same version from TWRP to migrate apps+data.
-2. Perform the *standard* TWRP factory reset (skip this if "wipe" is enabled).
-3. Install new ROM (optional)
-4. Reboot.
-  *Notes*: if the "wipe" feature is enabled, all Magisk modules, plus adb keys, ssh config & keys and a bunch of other system data are preserved across factory resets. Unless the 'noauto' config keyword is set, all migrated apps+data are automatically restored shortly after boot.
-  *WARNING*: "wipe" hasn't been tested on encrypted data! Thus, it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
+1. Reflash the same version from custom recovery to migrate and wipe data.
+2. Install new ROM, kernel, Magisk, GApps and so on (optional).
+3. Reboot.
 
 
 
 ---
 #### DEBUGGING & ADVANCED INFO
 
-Apps are temporarily disabled during respective data restore.
+Apps are temporarily disabled during data restore.
 
-$bkpFreq for "bkp <extra rsync option(s)> <SOURCE(s)> <DEST>" is $((bkpFreq + 3600)). That is, one hour after the set value. This prevents conflicts with bkp_appdata().
-
-How does this data protection thing actually work? At a glance, adk migrates select apps+data to /data/media/adk/migrated_data, so that these are unaffected by the standard TWRP factory reset. The automatic restore begins shortly after boot. When the "wipe" feature is enabled, all Magisk modules, plus adb keys, ssh config & keys and a bunch of other system data also survive factory resets. WARNING: "wipe" hasn't been tested on encrypted data! Thus, it's disabled by default. Leave it alone if you don't have at least a recent FULL (inc. internal media) /data backup on a different storage device!
+$bkpFreq for "bkp <extra rsync option(s)> <source(s)> <destination>" is $((bkpFreq + 3600)). That is, one hour after the set value. This prevents conflicts with bkp_appdata().
 
 If /data/media/adk/config.txt is missing, $modPath/default_config.txt is automatically copied to that location.
 
-If the file /data/.adk exists, adk reinstalls itself. No data migration/wipe is performed.
+If the file /data/.migrator exists during a reflash, migrator reinstalls itself. No data migration/wipe is performed.
 
-logsDir: /data/media/adk/logs
+Logs are stored at /data/media/adk/logs/.
 
-When external storage is detected, adk uses the largest partition for apps+data backups. Only the inc'd are backed up. After a factory reset, /data/media/adk/backups and/or <external storage>/adk/backups folders are renamed to backups.old. Thus, in case the automatic restore fails, backups won't be overwritten and adk wizard (option 3) can be used alternatively to restore apps+data. The automatic restore functions have a fail-safe mechanism -- run at most 3 more times as necessary. Apps usually fail to install due to missing dependencies and/or incompatible Android version.
+Verbose can be enabled with `touch /data/media/adk/verbose` and disabled with `rm /data/media/adk/verbose`. Under normal conditions, the file is automatically removed on exit.
 
-The "Test backupd()" option in adk wizard is meant for running all scheduled backups at any time (useful for debugging).
+When external storage is detected, migrator uses the largest partition for backups. Only the inc'd apps are backed up. After a factory reset, /data/media/adk/backups and/or <external storage>/adk/backups folders are renamed to backups.old. Thus, in case the automatic restore fails, backups won't be overwritten and wizard (option 3) can be used alternatively to restore data. The automatic restore has a fail-safe mechanism -- it runs at most 3 more times, as neeeded. Apps usually fail to install due to missing dependencies and/or incompatible Android version.
 
 
 
 ---
 #### LINKS
 
-- [Facebook Support Page](https://facebook.com/VR25-at-xda-developers-258150974794782)
-- [Git Repository](https://github.com/Magisk-Modules-Repo/adk)
-- [XDA Thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278)
+- [Donation](https://paypal.me/vr25xda/)
+- [Facebook page](https://facebook.com/VR25-at-xda-developers-258150974794782/)
+- [Git repository](https://github.com/Magisk-Modules-Repo/adk/)
+- [rsync](https://rsync.samba.org/)
+- [Telegram channel](https://t.me/vr25_xda/)
+- [Telegram profile](https://t.me/vr25xda/)
+- [XDA thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278/)
 
 
 
 ---
 #### LATEST CHANGES
+
+**2019.2.1 (201902010)**
+- Always reinstall on reflash (boot mode only).
+- Auto-wipe on reflash (recovery mode only) is enabled by default. `nowipe` disables it.
+- Do not start automatic backup/restore until system has fully booted.
+- Do not treat updated system apps as user apps.
+- General fixes
+- Increased SDcard wait timeout to 30 minutes (fail-safe).
+- Major optimizations
+- More accurate encrypted data detection
+- New name: Migrator
+- rsync 3.1.3 stable
+- Updated building and debugging tools.
+- Updated documentation & default config (simplified). Note: user config will be reset.
+- Verbose is disabled by default.
 
 **2018.12.25 (201812250)**
 - [adkd] Pause execution until /data is decrypted
@@ -220,11 +179,3 @@ The "Test backupd()" option in adk wizard is meant for running all scheduled bac
 - Exclude $modData and <external storage>/$MODID from media scan.
 - Use legacy variable increment syntax to prevent malfunction in legacy shells.
 - White-list irrelevant 'chmod' and 'chown' errors causing some manual restores to fail.
-
-**2018.9.19 (201809190)**
-- Fixed 'wrong instruction to create $modData upon install'.
-- Fixed 'rsync_util(), bad i variable'
-- Magisk 17.1 support
-- Performance and reliability improvements
-- Suppress irrelevant 'ln -s' error messages.
-- Wizard, 3 -- option to choose whether already installed apps should be filtered out.
