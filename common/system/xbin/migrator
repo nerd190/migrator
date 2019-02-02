@@ -195,7 +195,7 @@ ACTIONS
     1) reset; echo; restore_apps;;
     2) reset; echo; restore_data;;
     3) reset; echo; restore_apps_and_data;;
-    4) reset; echo; backupd ondemand;;
+    4) reset; echo; onboot ondemand;;
     5) reset; echo; debug_info;;
     6) reset; echo; rsync_util;;
     7) reset; echo; rm_uninstalled;;
@@ -292,6 +292,7 @@ restore() {
     fi
     pm disable "$pkg" 1>/dev/null || :
     $rsync -Drt --del "$appDataBkps/$pkg/" /data/data/$pkg
+   rm /data/data/$pkg/shared_prefs/com.google.android.gms.appid.xml 2>/dev/null || :
     echo
     restore_symlinks $appDataBkps/$pkg.lns
     o=$(grep "$pkg" "$pkgList" | awk '{print $2}')

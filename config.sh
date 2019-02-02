@@ -163,7 +163,7 @@ install_module() {
   mv $MODPATH/config.txt $MODPATH/default_config.txt
 
   # set default config
-  if [ ! -f $config ] || [ $curVer -lt 201901310 ]; then
+  if [ ! -f $config ] || [ $curVer -lt 201902020 ]; then
     cp -f $MODPATH/default_config.txt $config
   fi
 
@@ -197,14 +197,14 @@ exxit() {
 
 
 factory_reset() {
-  local d="" e=""
+  local d="" e="" line=""
   if [ $curVer -eq $(i versionCode) ]; then
     grep -iq '^noauto' $config 2>/dev/null || migrate_data
 
     # wipe data
     if ! grep -iq '^nowipe' $config 2>/dev/null; then
       ui_print " "
-      ui_print "(i) Wiping data, excluding adb/, media/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/)) and /cache/magisk*img.."
+      ui_print "(i) Performing a factory reset.."
 
       for e in $(ls -1A /data 2>/dev/null \
         | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
@@ -250,7 +250,11 @@ factory_reset() {
           (rm -rf /cache/$e) &
         done
       fi
-
+      
+      grep '^delete' $config | while IFS= read -r line; do
+        ! echo $line | grep -q delete.. || eval 'rm -rf $(echo $line | sed 's/^delete//')'
+      done
+      
       wait
     fi
     ui_print " "

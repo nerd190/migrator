@@ -1,4 +1,4 @@
-# Migrator - Android ROM Migration Utility
+# Migrator
 ## Copyright (C) 2018-2019, VR25 @ xda-developers
 ### License: GPL V3+
 #### README.md
@@ -25,7 +25,13 @@ To prevent fraud, DO NOT mirror any link associated with this project; DO NOT sh
 ---
 #### DESCRIPTION
 
-This is a ROM migration utility. On the flip side, it is a full backup solution, thanks to rsync and OpenSSH capabilities.
+This is a ROM migration utility. On the flip side, it is a full backup solution, thanks to rsync and OpenSSH capabilities. Note: this is in no way associated, nor does it have anything to do with the app "Migrate". While both have similar goals, they work differently and are not developed by the same individual/group.
+
+Regarding backups, these are just a secondary feature - the other side of the coin. You don't need to backup anything before using the data migration (and automatic factory reset) feature. In fact, even if you don't have the module installed, flashing it twice from recovery triggers data migration and factory reset. This is because apps are not copied (this takes time). Instead, they are moved to a location that is not wiped out by a regular factory reset. As you can imagine, this process is completed in seconds.
+
+Next, during the automatic factory reset, select data is left intact. Refer to the `NOTES/TIPS` section below for details.
+
+Finally, upon boot, apps are reinstalled (because recompilation is necessary) and respective data - instantly moved back to /data/data/. Symbolic links and filesystem permissions are handled afterwards.
 
 
 
@@ -42,6 +48,8 @@ This is a ROM migration utility. On the flip side, it is a full backup solution,
 
 *Basic*
 
+nobkp -- Disable automatic backups.
+
 bkpFreq=8 -- Incremental backup frequency in hours (value must be an integer, default: 8)
 
 inc <egrep pattern> -- Include packages in migrations and backups. If <package name> is not specified, all user apps are included. e.g., `inc sp.*fy|faceb`
@@ -53,6 +61,8 @@ noauto -- Do not migrate/auto-restore apps.
 nowipe -- Do not auto-wipe /data and /cache. Note that this also means extra data (e.g., system settings, Magisk modules) won't be preserved.
 
 *Advanced*
+
+delete <paths> -- Remove <paths> after factory reset.
 
 bkp <extra rsync option(s)> <source(s)> <destination> -- Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
 
@@ -75,19 +85,26 @@ Backup backed up apps and respective data to a remote machine
 - bkp -e "ssh -i <path to ssh key>" $appBkps $appdataBkps user@host:/<destination>
 
 *Default Configuration*
-`
-inc
+
+`inc
+nobkp
 bkpFreq=8
 inc term|provider
-`
+
+#delete /data/data/*provider*
+
+delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
+
+#delete /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img`
+
 
 
 ---
 #### NOTES/TIPS
 
-The word "provider" matches packages that store/provide contacts, SMSs/MMSs, call logs, etc..
+The word `provider` matches packages that store/provide contacts, SMSs/MMSs, call logs, etc..
 
-Migrated data includes adb/, data/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/) and /cache/magisk*img.
+Migrated data includes adb/, data/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/), data/.*provider.* and /cache/magisk.img.
 
 
 
@@ -113,7 +130,7 @@ Running `migrator` as root launches a wizard. Included options are incremental b
 
 - Factory reset
 1. Reflash the same version from custom recovery to migrate and wipe data.
-2. Install new ROM, kernel, Magisk, GApps and so on (optional).
+2. Install new ROM, kernel, Magisk, GApps, etc (optional).
 3. Reboot.
 
 
@@ -124,6 +141,8 @@ Running `migrator` as root launches a wizard. Included options are incremental b
 Apps are temporarily disabled during data restore.
 
 $bkpFreq for "bkp <extra rsync option(s)> <source(s)> <destination>" is $((bkpFreq + 3600)). That is, one hour after the set value. This prevents conflicts with bkp_appdata().
+
+By default, system-specific settings are not preserved (`/data/system*/0/, /data/system*/sync/, and /data/system*/users/`). These may be incompatible across different ROMs. If you still face issues, try removing `/data/data/*provider*` as well. Use the `delete <path>` config construct.
 
 If /data/media/adk/config.txt is missing, $modPath/default_config.txt is automatically copied to that location.
 
@@ -153,6 +172,14 @@ When external storage is detected, migrator uses the largest partition for backu
 ---
 #### LATEST CHANGES
 
+**2019.2.2 (201902020)**
+- Added `delete` command for removing select data after a factory reset.
+- Automatic backups are disabled by default (`nobkp`).
+- Experimental fix for push notifications.
+- Fixed wizard option 4: backupd not found.
+- System-specific settings are not preserved by default. Refer to `README.md` for details.
+- Updated usage instructions, module description and defaut config (user config will be reset).
+
 **2019.2.1 (201902010)**
 - Always reinstall on reflash (boot mode only).
 - Auto-wipe on reflash (recovery mode only) is enabled by default. `nowipe` disables it.
@@ -174,8 +201,3 @@ When external storage is detected, migrator uses the largest partition for backu
 - [General] Magisk 18 support
 - [Misc] Updated building and debugging tools
 - ["wipe"] Preserve Bluetooth settings
-
-**2018.9.22 (201809220)**
-- Exclude $modData and <external storage>/$MODID from media scan.
-- Use legacy variable increment syntax to prevent malfunction in legacy shells.
-- White-list irrelevant 'chmod' and 'chown' errors causing some manual restores to fail.

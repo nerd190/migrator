@@ -88,6 +88,7 @@ bkp_appdata() {
           $rsync -Drtu --del \
             --exclude=cache --exclude=code_cache \
             --exclude=app_webview/GPUCache \
+            --exclude=shared_prefs/com.google.android.gms.appid.xml \
             --inplace /data/data/$pkg "$appDataBkps" 1>/dev/null 2>&1 || :
           bkp_symlinks
         fi
@@ -99,6 +100,7 @@ bkp_appdata() {
           $rsync -Drtu --del \
             --exclude=cache --exclude=code_cache \
             --exclude=app_webview/GPUCache \
+            --exclude=shared_prefs/com.google.android.gms.appid.xml \
             --inplace /data/data/$pkg "$appDataBkps" >/dev/null 2>&1 || :
           bkp_symlinks
         fi
@@ -117,6 +119,7 @@ onboot() {
     set -u
     restore_on_boot
     retry_failed_restores
+    ! grep -iq nobkp $config || exit 0
     find_sdcard
     bkp_apps
     (bkp_appdata) &
@@ -190,6 +193,7 @@ restore_on_boot() {
         pm disable $pkg 1>/dev/null
         rm -rf /data/data/$pkg
         mv $migratedData/$pkg /data/data/
+        rm /data/data/$pkg/shared_prefs/com.google.android.gms.appid.xml 2>/dev/null
         restore_symlinks $migratedData/$pkg.lns
         rm $migratedData/$pkg.lns 2>/dev/null
         o=$(grep "$pkg" "$pkgList" | awk '{print $2}')
