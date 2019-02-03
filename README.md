@@ -90,10 +90,11 @@ Backup backed up apps and respective data to a remote machine
 nobkp
 bkpFreq=8
 inc term|provider
+migrationThreads=8
 
 #delete /data/data/*provider*
 
-delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
+#delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
 
 #delete /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img`
 
@@ -102,16 +103,16 @@ delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
 ---
 #### NOTES/TIPS
 
-The word `provider` matches packages that store/provide contacts, SMSs/MMSs, call logs, etc..
+The higher the `migrationThreads` value is, the faster apps+data migration runs (at the cost of higher CPU power and RAM usages). Obviously you should not abuse this.
 
-Migrated data includes adb/, data/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/), data/.*provider.* and /cache/magisk.img.
+The word `provider` matches packages that store/provide contacts, SMSs/MMSs, call logs, etc.. Unfortunately, this kind of data is not guaranteed to work across different Android versions or heavily distinct ROMs (e.g., LineageOS - stock).
 
 
 
 ---
 #### TERMINAL
 
-Running `migrator` as root launches a wizard. Included options are incremental backups, data restore and more.
+Running `migrator` as root launches a wizard. Included options are incremental backups, data restore, and more.
 
 
 
@@ -142,17 +143,17 @@ Apps are temporarily disabled during data restore.
 
 $bkpFreq for "bkp <extra rsync option(s)> <source(s)> <destination>" is $((bkpFreq + 3600)). That is, one hour after the set value. This prevents conflicts with bkp_appdata().
 
-By default, system-specific settings are not preserved (`/data/system*/0/, /data/system*/sync/, and /data/system*/users/`). These may be incompatible across different ROMs. If you still face issues, try removing `/data/data/*provider*` as well. Use the `delete <path>` config construct.
-
 If /data/media/adk/config.txt is missing, $modPath/default_config.txt is automatically copied to that location.
 
 If the file /data/.migrator exists during a reflash, migrator reinstalls itself. No data migration/wipe is performed.
 
 Logs are stored at /data/media/adk/logs/.
 
+Migrated data includes adb/, app/ /data/ data/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/(0/accounts.*|storage.xml|sync/accounts.*|users/), data/.*provider.* and /cache/magisk.img.
+
 Verbose can be enabled with `touch /data/media/adk/verbose` and disabled with `rm /data/media/adk/verbose`. Under normal conditions, the file is automatically removed on exit.
 
-When external storage is detected, migrator uses the largest partition for backups. Only the inc'd apps are backed up. After a factory reset, /data/media/adk/backups and/or <external storage>/adk/backups folders are renamed to backups.old. Thus, in case the automatic restore fails, backups won't be overwritten and wizard (option 3) can be used alternatively to restore data. The automatic restore has a fail-safe mechanism -- it runs at most 3 more times, as neeeded. Apps usually fail to install due to missing dependencies and/or incompatible Android version.
+When external storage is detected, migrator uses the largest partition for backups. Only the inc'd apps are backed up. After a factory reset, /data/media/adk/backups and/or <external storage>/adk/backups folders are renamed to backups.old. Thus, in case the automatic restore fails, backups won't be overwritten and wizard (option 3) can be used alternatively to restore data. The automatic restore has a fail-safe mechanism -- it runs at most 3 times, as neeeded. Apps usually fail to install due to missing dependencies and/or incompatible Android version. After the 6th failed attempt, `/data/media/adk/failed_restores` is renamed to `failed_restores.old`. If you revert to the original name, you get 3 more restore attempts on the next boot.
 
 
 
@@ -164,6 +165,7 @@ When external storage is detected, migrator uses the largest partition for backu
 - [Git repository](https://github.com/Magisk-Modules-Repo/adk/)
 - [rsync](https://rsync.samba.org/)
 - [Telegram channel](https://t.me/vr25_xda/)
+- [Telegram group](https://t.me/migrator_magisk/)
 - [Telegram profile](https://t.me/vr25xda/)
 - [XDA thread](https://forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278/)
 
@@ -171,6 +173,16 @@ When external storage is detected, migrator uses the largest partition for backu
 
 ---
 #### LATEST CHANGES
+
+**2019.2.3 (201902030)**
+- Added [Telegram group link](https://t.me/migrator_magisk/).
+- Customizable multithreading for apps+data migration.
+- Do not retry app restore after the 3rd failed attempt. This can be overridden. Refer to README.md for details.
+- General fixes & optimizations
+- Reverted "do not preserve system settings by default" (false alarm).
+- Show package names during apps+data migration.
+- Updated documentation and config.
+- Wait until pm (package manager) is ready before initiating app restore.
 
 **2019.2.2 (201902020)**
 - Added `delete` command for removing select data after a factory reset.
@@ -194,10 +206,3 @@ When external storage is detected, migrator uses the largest partition for backu
 - Updated building and debugging tools.
 - Updated documentation & default config (simplified). Note: user config will be reset.
 - Verbose is disabled by default.
-
-**2018.12.25 (201812250)**
-- [adkd] Pause execution until /data is decrypted
-- [General] Fixes and optimizations
-- [General] Magisk 18 support
-- [Misc] Updated building and debugging tools
-- ["wipe"] Preserve Bluetooth settings

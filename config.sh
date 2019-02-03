@@ -105,12 +105,10 @@ set_permissions() {
 # Make update-binary as clean as possible, try to only do function calls in it.
 
 
-trap 'exxit $? $? 1>/dev/null 2>&1' EXIT
-
-
 install_module() {
 
   set -euxo pipefail
+  trap 'exxit $? $? 1>/dev/null 2>&1' EXIT
 
   modData=/data/media/$MODID
   migratedData=$modData/migrated_data
@@ -163,22 +161,27 @@ install_module() {
   mv $MODPATH/config.txt $MODPATH/default_config.txt
 
   # set default config
-  if [ ! -f $config ] || [ $curVer -lt 201902020 ]; then
+  if [ ! -f $config ] || [ $curVer -lt 201902020 ] || [ $curVer -gt $(i versionCode) ]; then
     cp -f $MODPATH/default_config.txt $config
   fi
 
-  [ -f /data/.migrator ] && rm /data/.migrator
+  if [ $curVer -lt 201902030 ]; then
+    sed -i 's/^delete/#delete/g' $config || :
+    grep -q migrationThreads $config || echo migrationThreads=8 >> $config
+  fi
+
+  rm /data/.migrator 2>/dev/null || :
   set +euxo pipefail
 }
 
 
 migrate_bkps() {
   if [ -d "$iBkps" ]; then
-    rm -rf $iBkps.old || :
+    rm -rf $iBkps.old 2>/dev/null || :
     mv $iBkps $iBkps.old
   fi
   if [ -d "$eBkps" ]; then
-    rm -rf $eBkps.old || :
+    rm -rf $eBkps.old 2>/dev/null || :
     mv $eBkps $eBkps.old
   fi
 } 2>/dev/null
@@ -203,61 +206,59 @@ factory_reset() {
 
     # wipe data
     if ! grep -iq '^nowipe' $config 2>/dev/null; then
-      ui_print " "
-      ui_print "(i) Performing a factory reset.."
+      ui_print "- Wiping /data and /cache..."
 
       for e in $(ls -1A /data 2>/dev/null \
         | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
       do
-        (rm -rf /data/$e) &
+        rm -rf /data/$e
       done
 
       for e in $(ls -1A /data/data 2>/dev/null \
         | grep -Ev 'provider' 2>/dev/null)
       do
-        (rm -rf /data/data/$e) &
+        rm -rf /data/data/$e
       done
 
       for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
       do
-        (rm -rf /data/misc/$e) &
+        rm -rf /data/misc/$e
       done
 
       for e in $(ls -1A /data/system* 2>/dev/null \
         | grep -Ev '^/.*:$|^0$|^sync$|^storage.xml$|^users$' 2>/dev/null)
       do
-        (rm -rf /data/system*/$e 2>/dev/null) &
+        rm -rf /data/system*/$e
       done
 
       for e in $(ls -1A /data/system/sync 2>/dev/null \
         | grep -v '^accounts.xml$' 2>/dev/null)
       do
-        (rm -rf /data/system/sync/$e) &
+        rm -rf /data/system/sync/$e
       done
 
       for e in $(ls -1A /data/system*/0 2>/dev/null \
         | grep -Ev '^/.*:$|^accounts.*db$|^accounts.*al$' 2>/dev/null)
       do
-        (rm -rf /data/system*/0/$e 2>/dev/null) &
+        rm -rf /data/system*/0/$e
       done
 
       for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
-        (rm -rf $d) &
+        rm -rf $d
       done
 
       if mount -o remount,rw /cache 2>/dev/null; then
         for e in $(ls -1A /cache 2>/dev/null | grep -v '^magisk*img$' 2>/dev/null); do
-          (rm -rf /cache/$e) &
+          rm -rf /cache/$e
         done
       fi
-      
+
+      set +eo pipefail
       grep '^delete' $config | while IFS= read -r line; do
         ! echo $line | grep -q delete.. || eval 'rm -rf $(echo $line | sed 's/^delete//')'
       done
-      
-      wait
+
     fi
-    ui_print " "
     exxit 0
   fi
 }
@@ -278,31 +279,31 @@ find_sdcard() {
 
 
 migrate_data() {
-  local pkg=""
+  local pkg="" thread=0
+  local threads=$(( $(sed -n 's/^migrationThreads=//p' $config) - 1 )) || :
   if grep -q '^inc' $config 2>/dev/null; then
-    ui_print " "
-    ui_print "(i) Migrating apps.."
+    ui_print "- Migrating apps+data ($(( $threads + 1 )) threads)..."
     set +e
     { rm -rf $failedRes.old $migratedData.old
     mv $failedRes $failedRes.old
     mv $migratedData $migratedData.old; } 2>/dev/null
     set -e
-    awk '{print $1}' $pkgList | \
-      while read pkg; do
-        (pkg=$pkg # make sure value doesn't change until subshell exits
-        if ! ls -p /data/app/$pkg* 2>/dev/null | grep -q /; then
-          # system app
-          match_test inc $pkg && migrate_apk_plus_data
-        else
-          # user app
-          if { grep -q '^inc$' $config || match_test inc $pkg; } \
-            && ! match_test exc $pkg \
-            && ! grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'
-          then
-            migrate_apk_plus_data
+    for pkg in $(awk '{print $1}' $pkgList); do
+      [ $thread -gt $threads ] && { wait; thread=0; }
+      if grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'; then
+        if match_test inc $pkg && ! match_test exc $pkg; then
+          thread=$(( thread + 1 )) || :
+          (pkg=$pkg; migrate_apk_plus_data) &
+        fi
+      else
+        if ! match_test exc $pkg; then
+          if grep -q '^inc$' $config || match_test inc $pkg; then
+            thread=$(( thread + 1 )) || :
+            (pkg=$pkg; migrate_apk_plus_data) &
           fi
-        fi) &
-      done
+        fi
+      fi
+    done
     migrate_bkps
     wait
   fi
@@ -311,6 +312,7 @@ migrate_data() {
 
 # migrate APKs and respective data to $migratedData
 migrate_apk_plus_data() {
+  ui_print "  - $pkg"
   mkdir -p $migratedData $migratedData
   bkp_symlinks
   mv /data/data/$pkg $migratedData/
@@ -327,7 +329,7 @@ migrate_apk_plus_data() {
 match_test() {
   local p=""
   for p in $(sed -n "s/^$1 //p" $config); do
-    echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || :
+    echo "$2" | grep -Eq "$p" 2>/dev/null && return 0 || :
   done
   return 1
 }
@@ -359,8 +361,7 @@ version_info() {
   cat ${config%/*}/info/README.md | while read line; do
     echo "$line" | grep -q '\*\*.*\(.*\)\*\*' && println=true
     $println && echo "$line" | grep -q '^$' && break
-    #$println && ui_print "$(echo "    $line" | grep -v '\*\*.*\(.*\)\*\*')"
-    $println && echo "    $line" | grep -v '\*\*.*\(.*\)\*\*' >> /proc/self/fd/$OUTFD
+    $println && line="$(echo "    $line" | grep -v '\*\*.*\(.*\)\*\*')" && ui_print "$line"
   done
   ui_print " "
 
@@ -369,6 +370,7 @@ version_info() {
   ui_print "    - Facebook page: facebook.com/VR25-at-xda-developers-258150974794782/"
   ui_print "    - Git repository: github.com/Magisk-Modules-Repo/adk/"
   ui_print "    - Telegram channel: t.me/vr25_xda/"
+  ui_print "    - Telegram group: t.me/migrator_magisk/"
   ui_print "    - Telegram profile: t.me/vr25xda/"
   ui_print "    - XDA thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278/"
   ui_print " "

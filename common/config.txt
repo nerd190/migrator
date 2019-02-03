@@ -5,9 +5,10 @@ inc
 nobkp
 bkpFreq=8
 inc term|provider
+migrationThreads=8
 
 #delete /data/data/*provider*
 
-delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
+#delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
 
 #delete /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img

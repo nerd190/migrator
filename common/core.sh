@@ -68,11 +68,12 @@ bkp_apps() {
   mkdir -p "$apkBkps" "$appDataBkps"
   for pkg in $(find /data/app -type f -name base.apk); do
     pkgName=$(dirname $pkg | sed 's:/data/app/::; s:-.*::')
-    if { grep -q '^inc$' $config || match_test inc $pkgName; } \
-      && ! match_test exc $pkgName \
-      && ! grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'
-    then
-      $rsync -tu --inplace $pkg "$apkBkps/$pkgName.apk"
+    if grep -q '^inc$' $config || match_test inc $pkgName; then
+      if ! match_test exc $pkgName \
+        && ! grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'
+      then
+        $rsync -tu --inplace $pkg "$apkBkps/$pkgName.apk"
+      fi
     fi
   done
 }
@@ -83,8 +84,8 @@ bkp_appdata() {
   local pkg=""
   while true; do
     for pkg in $(awk '{print $1}' $pkgList); do
-      if ! ls -p /data/app/$pkg* 2>/dev/null | grep -q /; then
-        if match_test inc $pkg; then
+      if grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'; then
+        if match_test inc $pkg && ! match_test exc $pkg; then
           $rsync -Drtu --del \
             --exclude=cache --exclude=code_cache \
             --exclude=app_webview/GPUCache \
@@ -93,16 +94,15 @@ bkp_appdata() {
           bkp_symlinks
         fi
       else
-        if { grep -q '^inc$' $config || match_test inc $pkg; } \
-          && ! match_test exc $pkg \
-          && ! grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'
-        then
-          $rsync -Drtu --del \
-            --exclude=cache --exclude=code_cache \
-            --exclude=app_webview/GPUCache \
-            --exclude=shared_prefs/com.google.android.gms.appid.xml \
-            --inplace /data/data/$pkg "$appDataBkps" >/dev/null 2>&1 || :
-          bkp_symlinks
+        if match_test exc $pkg; then
+          if grep -q '^inc$' $config || match_test inc $pkg; then
+            $rsync -Drtu --del \
+              --exclude=cache --exclude=code_cache \
+              --exclude=app_webview/GPUCache \
+              --exclude=shared_prefs/com.google.android.gms.appid.xml \
+              --inplace /data/data/$pkg "$appDataBkps" >/dev/null 2>&1 || :
+            bkp_symlinks
+          fi
         fi
       fi
     done
@@ -114,6 +114,7 @@ bkp_appdata() {
 
 
 onboot() {
+  local pmReady=false
   set +u
   if [ "x$1" != xondemand ]; then
     set -u
@@ -179,15 +180,18 @@ restore_on_boot() {
   then
     set +eo pipefail
     wait_booted
+    if ! $pmReady; then
+      until pm get-install-location 1>/dev/null 2>&1; do sleep 10; done
+      pmReady=true
+    fi
     for pkg in $(ls -1p $migratedData | grep / | tr -d /); do
-      if grep -q $pkg $pkgList; then
-        [ -f $migratedData/$pkg.apk ] \
-          && pm install -r $migratedData/$pkg.apk 1>/dev/null \
-          && rm $migratedData/$pkg.apk
-      else
-        [ -f $migratedData/$pkg.apk ] \
-          && pm install $migratedData/$pkg.apk 1>/dev/null \
-          && rm $migratedData/$pkg.apk
+      if [ -f $migratedData/$pkg.apk ]; then
+        if grep -q $pkg $pkgList; then
+          pm install -r $migratedData/$pkg.apk 1>/dev/null
+        else
+          pm install $migratedData/$pkg.apk 1>/dev/null
+        fi
+        [ $? -eq 0 ] && rm $migratedData/$pkg.apk
       fi
       if grep -q $pkg $pkgList; then
         pm disable $pkg 1>/dev/null
@@ -219,14 +223,19 @@ wait_booted() {
 
 
 retry_failed_restores() {
-  local c=""
-  for c in 1 2 3 4 5; do
+  local count=""
+  for count in 1 2; do
     if mv $failedRes $migratedData 2>/dev/null; then
       restore_on_boot
     else
       break
     fi
   done
+  if [ -d $failedRes ]; then
+    rm -rf $failedRes.old 2>/dev/null || :
+    mv $failedRes $failedRes.old 2>/dev/null || :
+  fi
+  unset pmReady
 }
 
 
@@ -235,7 +244,7 @@ retry_failed_restores() {
 match_test() {
   local p=""
   for p in $(sed -n "s/^$1 //p" $config); do
-    echo $2 | grep -Eq "$p" 2>/dev/null && return 0 || :
+    echo "$2" | grep -Eq "$p" 2>/dev/null && return 0 || :
   done
   return 1
 }
