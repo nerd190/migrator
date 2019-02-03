@@ -94,7 +94,7 @@ bkp_appdata() {
           bkp_symlinks
         fi
       else
-        if match_test exc $pkg; then
+        if ! match_test exc $pkg; then
           if grep -q '^inc$' $config || match_test inc $pkg; then
             $rsync -Drtu --del \
               --exclude=cache --exclude=code_cache \

@@ -181,7 +181,7 @@ Utilities
   4) Manual apps+data backup
   5) Debugging info
   6) rsync -hrtuv --inplace --progress --stats \$@
-  7) Remove select backups of uninstalled apps
+  7) Remove select backups of uninstalled and/or excluded apps
 ---
   0) Exit
 
@@ -266,8 +266,29 @@ mk_list() {
     | sed "s:$appDataBkps::; s:/::")
   do
     case "$1" in
-      not_installed) grep -q "$pkg" "$pkgList" && test=false || test=true;;
-      installed) grep -q "$pkg" "$pkgList" && test=true || test=false;;
+      not_installed)
+        if ! grep -q $pkg $pkgList; then
+          test=true
+        else
+          if grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'; then
+            if match_test inc $pkg && ! match_test exc $pkg; then
+              test=false
+            else
+              test=true
+            fi
+          else
+            if ! match_test exc $pkg; then
+              if grep -q '^inc$' $config || match_test inc $pkg; then
+                test=false
+              else
+                test=true
+              fi
+            else
+              test=true
+            fi
+          fi
+        fi;;
+      installed) grep -q $pkg $pkgList && test=true || test=false;;
       all) test=true;;
     esac
     if $test; then

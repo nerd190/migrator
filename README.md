@@ -174,6 +174,10 @@ When external storage is detected, migrator uses the largest partition for backu
 ---
 #### LATEST CHANGES
 
+**2019.2.3.1 (201902031)**
+- Fixed app data backup logic error.
+- Wizard option 7 can also remove backups of excluded apps.
+
 **2019.2.3 (201902030)**
 - Added [Telegram group link](https://t.me/migrator_magisk/).
 - Customizable multithreading for apps+data migration.
