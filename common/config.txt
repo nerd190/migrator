@@ -1,14 +1,22 @@
-# Migrator Configuration
-# /data/media/adk/config.txt
+# Migrator configuration
+# /data/media/migrator/config.txt
+# Lines starting with "#" are ignored.
 
 inc
-nobkp
+#nobkp
+#noapps
+#nowipe
+threads=8
 bkpFreq=8
-inc term|provider
-migrationThreads=8
+inc terminal
+#exc pitchblack
 
-#delete /data/data/*provider*
+disable xposed
 
-#delete /data/system*/0/ /data/system*/sync/ /data/system*/users/
+#remove $MOUNTPATH/xposed
 
-#delete /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img
+#remove /data/user*/*.provider* /data/user*/*.bookmarkprovider
+
+#remove /data/system*/0/ /data/system*/sync/ /data/system*/users/
+
+#remove /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img

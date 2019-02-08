@@ -5,7 +5,7 @@
 
 echo
 cd ${0%/*} 2>/dev/null
-for f in $(find ./ -type f -name '*.sh') ./common/system/*bin/migrator; do
+for f in $(find ./ -type f -name '*.sh') ./common/migrator; do
   bash -n $f
 done
 echo

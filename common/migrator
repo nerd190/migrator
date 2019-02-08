@@ -1,0 +1,350 @@
+#!/system/bin/sh
+# Migrator Wizard
+# Copyright (C) 2018-2019, VR25 @ xda-developers
+# License: GPL V3+
+
+
+[ -d /sbin/.magisk/busybox ] \
+  && PATH=/sbin/.magisk/busybox:$PATH \
+  || PATH=/sbin/.core/busybox:$PATH
+
+log=/data/media/migrator/logs/wizard.log
+
+
+umask 0
+set -euo pipefail
+
+
+# log
+if [ -f /data/media/migrator/verbose ]; then
+  rm /data/media/migrator/verbose
+  mkdir -p ${log%/*}
+  [ -f $log ] && grep -q .. $log && mv $log $log.old
+  set -x 2>>$log
+fi
+
+
+# set modPath
+modPath=/sbin/.magisk/img/migrator
+[ -f $modPath/module.prop ] || modPath=/sbin/.core/img/migrator
+[ -f $modPath/module.prop ] || { echo -e "\n(!) modPath not found\n"; exit 1; }
+. $modPath/core.sh
+
+
+main() {
+  local o=""
+  reset
+  cat <<ACTIONS
+
+Migrator Wizard
+
+Restore
+  1) Apps (replace)
+  2) Data (overwrite)
+  3) Apps+data
+Utilities
+  4) Manual apps+data backup
+  5) Documentation
+  6) rsync -hrtuv --inplace --progress --stats \$@
+---
+  0) Exit
+
+ACTIONS
+
+  echo -n "(i) Choose an option... "
+  read o
+
+  case $o in
+    0) echo -e "\n  Goodbye.\n"; exit 0;;
+    1) reset; echo; restore_apps;;
+    2) reset; echo; restore_data;;
+    3) reset; echo; restore_apps_and_data;;
+    4) reset; echo; onboot ondemand;;
+    5) reset; echo; doc;;
+    6) reset; echo; rsync_util;;
+    *) echo; echo -n "  (!) Invalid choice!"; sleep 2; main;;
+  esac
+}
+
+
+# generic incremental backup utility
+rsync_util() {
+  local a=""
+  echo -n "\nrsync -hrtuv --inplace --progress --stats "
+  read a
+  echo
+  while true; do
+    eval $rsync -hrtuv --inplace --progress --stats $a
+    echo
+    echo "(i) Next incremental backup in $bkpFreq hours"
+    echo "- Press CTRL+C (Vol. Down + C) to cancel the schedule and exit."
+    echo -n "- You may *minimize* this window."
+    sleep $((bkpFreq * 3600))
+    echo
+    echo
+  done
+}
+
+
+restore_apps() {
+  local pkg=""
+  local backupsDirOrig=$modData/backups
+  restore_from
+  if ls $backupsDir 2>/dev/null | grep -q \.apk; then
+    : > $tmpDir/pkg_list0
+    for pkg in $(ls -1 $backupsDir | grep \.apk); do
+      echo "- $pkg"
+      echo $pkg >> $tmpDir/pkg_list0
+    done
+    regex_prompt
+    if grep -q '[a-z]' $tmpDir/pkg_list; then
+      echo
+      echo "[Re]installing..."
+      pkg=""
+      for pkg in $(cat $tmpDir/pkg_list); do
+        echo -n "- $pkg"
+        if grep -q "^${pkg%.apk} " $pkgList; then
+          pm install -r $backupsDir/$pkg 1>/dev/null || :
+        else
+          pm install $backupsDir/$pkg 1>/dev/null || :
+        fi
+        [ $? -eq 0 ] && refresh_apk_backups ${pkg%.apk}
+        echo
+      done
+      post_restore apps apps
+    else
+      no_match restore_apps
+    fi
+  else
+    missing_bkp
+  fi
+}
+
+
+restore_data() {
+  restore_from
+  if ls -p $backupsDir 2>/dev/null | grep -q /; then
+    mk_list installed
+    regex_prompt
+    if grep -q '[a-z]' $tmpDir/pkg_list; then
+      restore data data
+    else
+      no_match restore_data
+    fi
+  else
+    missing_bkp
+  fi
+}
+
+
+restore_apps_and_data() {
+  local o="" pkg=""
+  restore_from
+  if ls $backupsDir 2>/dev/null | grep -q ..; then
+    echo -n "Filter out already installed apps? (Y/n) "
+    read o
+    reset
+    echo
+    echo $o | grep -iq n && mk_list all \
+      || mk_list not_installed
+    if ! grep -q '[a-z]' $tmpDir/pkg_list0; then
+      echo -e "(i) Nothing to restore\n"
+      o=""
+      select o in Exit "Main menu" \
+        "Restore apps (replace)" \
+        "Restore data (overwrite)"
+      do
+        case $o in
+          Exit) echo; exit 0;;
+          "Main menu") main; break;;
+          "Restore apps (replace)") reset; echo; restore_apps; break;;
+          "Restore data (overwrite)") reset; echo; restore_data; break;;
+        esac
+      done
+    fi
+    regex_prompt
+    if grep -q '[a-z]' $tmpDir/pkg_list; then
+      restore apps+data apps_and_data
+    else
+      no_match restore_apps_and_data
+    fi
+  else
+    missing_bkp
+  fi
+}
+
+
+doc() {
+  local doc=$modData/info/README.md
+  echo "(i) Type \"<esc> :q! <enter>\" to exit the editor."
+  echo -n "- Press <enter> to continue..."
+  read
+  vim $doc 2>/dev/null || vi $doc
+  exit_or_not
+}
+
+
+no_match() {
+  local o=""
+  echo -e "\n(!) No match!\n"
+  select o in Exit Retry "Main menu"; do
+    case $o in
+      Exit) echo; exit 0;;
+      Retry) reset; $1; break;;
+      "Main menu") main; break;;
+    esac
+  done
+}
+
+
+missing_bkp() {
+  echo
+  echo "(!) Backup folder not found or empty"
+  exit_or_not
+}
+
+
+post_restore() {
+  local o=""
+  echo
+  echo "Done. Now what?"
+  select o in Exit "Main menu" "Restore more $1"; do
+    case $o in
+      Exit) echo; exit 0;;
+      "Main menu") main; break;;
+      "Restore more $1") reset; restore_$2; break;;
+    esac
+  done
+}
+
+
+regex_prompt() {
+  local i=""
+  : > $tmpDir/pkg_list
+  echo
+  echo -n "(i) Type egrep pattern(s) (e.g., sp.*fy or duk|faceb|whats. A dot matches all) followed by <enter>... "
+  read i
+  [ -n "$i" ] && cat $tmpDir/pkg_list0 | grep -E "$i" 2>/dev/null > $tmpDir/pkg_list || :
+}
+
+
+mk_list() {
+  local pkg="" proceed=true
+  : > $tmpDir/pkg_list0
+  for pkg in $(find $backupsDir -type d -maxdepth 1 \
+    | sed "s:$backupsDir::; s:/::")
+  do
+    proceed=true
+    case $1 in
+      not_installed) ! grep -q "^$pkg " $pkgList || proceed=false;;
+      installed) grep -q "^$pkg " $pkgList || proceed=false;;
+    esac
+    if $proceed; then
+      echo "- $pkg"
+      echo $pkg >> $tmpDir/pkg_list0
+    fi
+  done
+}
+
+
+restore() {
+  local pkg=""
+  local owner=""
+  local backupsDirOrig=$modData/backups
+  set +e
+  echo
+  echo "Restoring $1..."
+  for pkg in $(cat $tmpDir/pkg_list); do
+    echo "- $pkg"
+    if [ "x$1" = xapps+data ]; then
+      if [ -f $backupsDir/$pkg.apk ]; then
+        if grep -q "^$pkg " $pkgList; then
+          pm install -r $backupsDir/$pkg.apk 1>/dev/null
+        else
+          pm install $backupsDir/$pkg.apk 1>/dev/null
+        fi
+        [ $? -ne 0 ] && refresh_backups $pkg.apk
+        if grep -q "^$pkg " $pkgList; then # refresh backups to free up space
+          set +o pipefail
+          rm $backupsDirOrig/$pkg.apk
+          cp -al $(grep name=\"$pkg\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
+            $backupsDirOrig/$pkg.apk
+          if [ -f $backupsDirOrig.old/$pkg.apk ]; then
+            rm $backupsDirOrig.old/$pkg.apk
+            cp -al $backupsDirOrig/$pkg.apk $backupsDirOrig.old/
+          fi
+          set -o pipefail
+        fi
+      fi
+    fi
+    if grep -q "^$pkg " $pkgList; then
+      pm disable $pkg 1>/dev/null
+      rm -rf /data/data/$pkg
+      cp -al $backupsDir/$pkg /data/data/
+      rm /data/data/$pkg/shared_prefs/com.google.android.gms.appid.xml 2>/dev/null
+      owner=$(grep "^$pkg " $pkgList | awk '{print $2}')
+      chown -R $owner:$owner /data/data/$pkg 2>/dev/null
+      chmod -R 0771 /data/data/$pkg 2>/dev/null
+      restorecon -R /data/data/$pkg 2>/dev/null
+      symlink_lib $pkg
+      pm enable $pkg 1>/dev/null
+    fi
+  done
+  set -e
+  post_restore $1 $2
+}
+
+
+exit_or_not() {
+  local o=""
+  echo
+  select o in Exit "Main menu"; do
+    case $o in
+      Exit) echo; exit 0;;
+      "Main menu") main; break;;
+     esac
+  done
+}
+
+
+restore_from() {
+  local o="" backupsDirOrig=$backupsDir
+  echo "(?) Restore from..."
+  echo
+  select o in $backupsDir $backupsDir.old \
+    $migratedData $migratedData.old \
+    $failedRes $failedRes.old "<custom>" \
+    "-- Return to main menu --" "-- Exit --"
+  do
+    case $o in
+      "<custom>") echo -n "Custom path: "; read backupsDir;;
+      "-- Return to main menu --") main; break;;
+      "-- Exit --") echo; exit 0;;
+      *) backupsDir=$o;;
+    esac
+    if ! ls -p $o 2>/dev/null | grep -q /; then
+      echo
+      echo "(!) Empty/invalid location"
+      echo
+      backupsDir=$backupsDirOrig
+      restore_from
+    fi
+    break
+  done
+  reset
+  echo
+}
+
+
+set +euo pipefail
+if echo "$1" | grep -q '\-v'; then
+  echo
+  touch $modData/verbose
+  echo "(i) Verbose enabled for the next running session"
+  echo
+  exit 0
+fi
+set -euo pipefail
+
+
+main

@@ -110,25 +110,20 @@ install_module() {
   set -euxo pipefail
   trap 'exxit $? $? 1>/dev/null 2>&1' EXIT
 
+  leaveImgMounted=false
   modData=/data/media/$MODID
   migratedData=$modData/migrated_data
   config=$modData/config.txt
   modInfo=$modData/info
   magiskVer=${MAGISK_VER/.}
   pkgList=/data/system/packages.list
-  externalStorage=/external_sd
   MOUNTPATH0=$MOUNTPATH
-  rsync=$MOUNTPATH/$MODID/bin/rsync
   failedRes=$modData/failed_restores
 
   if $BOOTMODE; then
-    find_sdcard
     MOUNTPATH0=/sbin/.magisk/img
     [ -d $MOUNTPATH0 ] || MOUNTPATH0=/sbin/.core/img
   fi
-
-  iBkps=$modData/backups
-  eBkps=$externalStorage/$MODID/backups
 
   curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || :)
   [ -z "$curVer" ] && curVer=0
@@ -136,11 +131,9 @@ install_module() {
   # get CPU arch
   case "$ARCH" in
     *86*) binArch=x86;;
-    *ar*) binArch=arm;;
-    *) ui_print " "
-       ui_print "(!) Unsupported CPU architecture ($ARCH)!"
-       ui_print " "
-       exxit 1;;
+    *arm*) binArch=arm;;
+    *) ui_print "(!) rsync_$ARCH binary is not included!"
+        binArch=dummy;;
   esac
 
   [ ! -f /data/.migrator ] && ! $BOOTMODE && factory_reset
@@ -148,6 +141,13 @@ install_module() {
   # create module paths
   rm -rf $MODPATH 2>/dev/null || :
   mkdir -p $MODPATH/bin $modInfo
+  [ -d /system/xbin ] && mkdir -p $MODPATH/system/xbin \
+    || mkdir -p $MODPATH/system/bin
+
+  # remove legacy version
+  if touch $MOUNTPATH0/adk/remove 2>/dev/null; then
+    [ -f $config ] || mv /data/media/adk/config.txt $config 2>/dev/null || :
+  fi
 
   # extract module files
   ui_print "- Extracting module files"
@@ -156,35 +156,24 @@ install_module() {
   mv bin/rsync_$binArch $MODPATH/bin/rsync
   mv common/* $MODPATH/
   $LATESTARTSERVICE || rm $MODPATH/service.sh
-  [ -d /system/xbin ] || mv $MODPATH/system/xbin $MODPATH/system/bin
+  mv $MODPATH/migrator $MODPATH/system/*bin/
+  cp -l $MODPATH/system/*bin/migrator $(echo -n $MODPATH/system/*bin)/M
   mv -f License* README* $modInfo/
   mv $MODPATH/config.txt $MODPATH/default_config.txt
 
   # set default config
-  if [ ! -f $config ] || [ $curVer -lt 201902020 ] || [ $curVer -gt $(i versionCode) ]; then
+  if [ ! -f $config ] || [ $curVer -lt 201902080 ] || [ $curVer -gt $(i versionCode) ]; then
+    set +e
+    rm $config.older 2>/dev/null
+    mv $config.old $config.older 2>/dev/null
+    mv $config $config.old 2>/dev/null
+    set -e
     cp -f $MODPATH/default_config.txt $config
-  fi
-
-  if [ $curVer -lt 201902030 ]; then
-    sed -i 's/^delete/#delete/g' $config || :
-    grep -q migrationThreads $config || echo migrationThreads=8 >> $config
   fi
 
   rm /data/.migrator 2>/dev/null || :
   set +euxo pipefail
 }
-
-
-migrate_bkps() {
-  if [ -d "$iBkps" ]; then
-    rm -rf $iBkps.old 2>/dev/null || :
-    mv $iBkps $iBkps.old
-  fi
-  if [ -d "$eBkps" ]; then
-    rm -rf $eBkps.old 2>/dev/null || :
-    mv $eBkps $eBkps.old
-  fi
-} 2>/dev/null
 
 
 exxit() {
@@ -195,6 +184,11 @@ exxit() {
     set -u
     rm -rf $TMPDIR
   fi
+  if $leaveImgMounted; then
+    mount -o rw /
+    mkdir -p /M
+    mount /data/adb/magisk.img /M
+  fi
   exit $1
 }
 
@@ -202,20 +196,21 @@ exxit() {
 factory_reset() {
   local d="" e="" line=""
   if [ $curVer -eq $(i versionCode) ]; then
-    grep -iq '^noauto' $config 2>/dev/null || migrate_data
+    grep -iq '^noapps' $config 2>/dev/null || migrate
 
     # wipe data
     if ! grep -iq '^nowipe' $config 2>/dev/null; then
+      leaveImgMounted=true
       ui_print "- Wiping /data and /cache..."
 
       for e in $(ls -1A /data 2>/dev/null \
-        | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$' 2>/dev/null)
+        | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$|^user' 2>/dev/null)
       do
         rm -rf /data/$e
       done
 
-      for e in $(ls -1A /data/data 2>/dev/null \
-        | grep -Ev 'provider' 2>/dev/null)
+      for e in $(ls -1A /data/user*/* 2>/dev/null \
+        | grep -Ev '^/.*:$|\.provider|\.bookmarkprovider' 2>/dev/null)
       do
         rm -rf /data/data/$e
       done
@@ -226,7 +221,7 @@ factory_reset() {
       done
 
       for e in $(ls -1A /data/system* 2>/dev/null \
-        | grep -Ev '^/.*:$|^0$|^sync$|^storage.xml$|^users$' 2>/dev/null)
+        | grep -Ev '^/.*:$|^[0-99]$|^sync$|^storage.xml$|^users$' 2>/dev/null)
       do
         rm -rf /data/system*/$e
       done
@@ -237,10 +232,10 @@ factory_reset() {
         rm -rf /data/system/sync/$e
       done
 
-      for e in $(ls -1A /data/system*/0 2>/dev/null \
+      for e in $(ls -1A /data/system*/[0-99] 2>/dev/null \
         | grep -Ev '^/.*:$|^accounts.*db$|^accounts.*al$' 2>/dev/null)
       do
-        rm -rf /data/system*/0/$e
+        rm -rf /data/system*/[0-99]/$e
       done
 
       for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
@@ -254,8 +249,14 @@ factory_reset() {
       fi
 
       set +eo pipefail
-      grep '^delete' $config | while IFS= read -r line; do
-        ! echo $line | grep -q delete.. || eval 'rm -rf $(echo $line | sed 's/^delete//')'
+      # disable <module ID>
+      grep '^disable' $config | while IFS= read -r line; do
+        echo $line | grep -q disable.. && eval 'touch $MOUNTPATH/$(echo $line | sed 's/^disable//') 2>/dev/null'
+      done
+
+      # removes <paths>
+      grep '^remove' $config | while IFS= read -r line; do
+        echo $line | grep -q remove.. && eval 'rm -rf $(echo $line | sed 's/^remove//') 2>/dev/null'
       done
 
     fi
@@ -264,84 +265,57 @@ factory_reset() {
 }
 
 
-find_sdcard() {
-  local d="" size=0 newSize=0
-  if grep -q '/mnt/media_rw' /proc/mounts; then
-    for d in /mnt/media_rw/*; do
-      newSize=$(df "$d" | tail -n 1 | awk '{print $2}')
-      if [ "$newSize" -gt "$size" ]; then
-        size=$newSize
-        externalStorage="$d"
-      fi
-    done
-  fi
-}
-
-
-migrate_data() {
+migrate() {
   local pkg="" thread=0
-  local threads=$(( $(sed -n 's/^migrationThreads=//p' $config) - 1 )) || :
+  local threads=$(( $(sed -n 's/^threads=//p' $config) - 1 )) || :
   if grep -q '^inc' $config 2>/dev/null; then
-    ui_print "- Migrating apps+data ($(( $threads + 1 )) threads)..."
+    ui_print "- Migrating ($((threads + 1)) threads)..."
     set +e
     { rm -rf $failedRes.old $migratedData.old
     mv $failedRes $failedRes.old
     mv $migratedData $migratedData.old; } 2>/dev/null
+    mkdir -p $migratedData
     set -e
     for pkg in $(awk '{print $1}' $pkgList); do
       [ $thread -gt $threads ] && { wait; thread=0; }
-      if grep $pkg /data/system/packages.xml | grep -q '/system/.*app/'; then
+      if ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/'; then
         if match_test inc $pkg && ! match_test exc $pkg; then
           thread=$(( thread + 1 )) || :
-          (pkg=$pkg; migrate_apk_plus_data) &
+          (pkg=$pkg; apps_and_data) &
         fi
       else
         if ! match_test exc $pkg; then
           if grep -q '^inc$' $config || match_test inc $pkg; then
             thread=$(( thread + 1 )) || :
-            (pkg=$pkg; migrate_apk_plus_data) &
+            (pkg=$pkg; apps_and_data) &
           fi
         fi
       fi
     done
-    migrate_bkps
     wait
   fi
 }
 
 
-# migrate APKs and respective data to $migratedData
-migrate_apk_plus_data() {
+apps_and_data() {
   ui_print "  - $pkg"
-  mkdir -p $migratedData $migratedData
-  bkp_symlinks
   mv /data/data/$pkg $migratedData/
   set +eo pipefail
-  grep $pkg /data/system/packages.xml | grep -q '/system/.*app/' \
-    || mv $(find /data/app/$pkg* type f -name base.apk 2>/dev/null | head -n 1) \
+  ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
+    || mv $(grep name=\"$pkg\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
       $migratedData/$pkg.apk 2>/dev/null
   set -eo pipefail
 }
 
 
-#$1="inc or exc"
-#$2=pkgName
+# $1 -- <inc or exc>
+# $2 -- <package name>
 match_test() {
-  local p=""
-  for p in $(sed -n "s/^$1 //p" $config); do
-    echo "$2" | grep -Eq "$p" 2>/dev/null && return 0 || :
+  local target=""
+  for target in $(sed -n "s/^$1 //p" $config); do
+    echo $2 | grep -Eq "$target" 2>/dev/null && return 0 || :
   done
   return 1
-}
-
-
-bkp_symlinks() {
-  local l="" lns=$migratedData/$pkg.lns
-  : >$lns
-  for l in $(find /data/data/$pkg -type l); do
-    echo "$(readlink -f $l | sed "s:$pkg.*/lib/[^/]*:$pkg\*/lib/\*:; s:$pkg.*/lib/:$pkg\*/lib/:") $l" >>$lns
-  done
-  grep -q '^/' $lns || rm $lns
 }
 
 
@@ -350,7 +324,7 @@ version_info() {
   local println=false
 
   # a note on untested Magisk versions
-  if [ ${MAGISK_VER/.} -gt 180 ]; then
+  if [ ${MAGISK_VER/.} -gt 181 ]; then
     ui_print " "
     ui_print "  (i) NOTE: this Magisk version hasn't been tested by @VR25!"
     ui_print "    - If you come across any issue, please report."
@@ -368,7 +342,7 @@ version_info() {
   ui_print "  LINKS"
   ui_print "    - Donation: https://paypal.me/vr25xda/"
   ui_print "    - Facebook page: facebook.com/VR25-at-xda-developers-258150974794782/"
-  ui_print "    - Git repository: github.com/Magisk-Modules-Repo/adk/"
+  ui_print "    - Git repository: github.com/Magisk-Modules-Repo/migrator/"
   ui_print "    - Telegram channel: t.me/vr25_xda/"
   ui_print "    - Telegram group: t.me/migrator_magisk/"
   ui_print "    - Telegram profile: t.me/vr25xda/"
