@@ -183,6 +183,9 @@ Preserved data includes `adb/, app/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, s
 ---
 #### LATEST CHANGES
 
+**2019.2.12-r3 (201902122)**
+- Fixed "refresh_backups not found".
+
 **2019.2.12-r2 (201902121)**
 - Fixed "unset parameter" error during automatic restore. Those who tried to migrate recently and the automatic restore failed, install this update, rename /data/media/migrator/`failed_restores.old` to `failed_restores` and reboot. The automatic restore should resume. Alternatively, apps+data can be restored manually and directly from `failed_restores.old`, using the wizard - even the previous version.
 
@@ -208,7 +211,3 @@ Preserved data includes `adb/, app/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, s
 - Super fast snapshots with virtually no extra storage space needed (no sdcard, no problem). Automatic backups are enabled by default.
 - Updated documentation (much more detailed and comprehensive) and default config (user config will be reset this time).
 - Wizard can be launched either by running `migrator` or `M`. `M -v (or --verbose)` enables verbose for the next running session. The 5th option from the wizard menu shows the project's documentation.
-
-**2019.2.3.1 (201902031)**
-- Fixed app data backup logic error.
-- Wizard option 7 can also remove backups of excluded apps.

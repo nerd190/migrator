@@ -261,7 +261,7 @@ restore() {
         else
           pm install $backupsDir/$pkg.apk 1>/dev/null
         fi
-        [ $? -eq 0 ] && refresh_backups $pkg.apk
+        [ $? -eq 0 ] && refresh_apk_backups $pkg.apk
       fi
     fi
     if grep -q "^$pkg " $pkgList; then
