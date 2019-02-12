@@ -31,7 +31,7 @@ Regarding backups, these are a secondary feature - the other side of the coin. Y
 
 Backups are the snapshot type and super fast - thanks to the magic of hard links. These take virtually no extra space in your internal storage. Yes, you do not need an SDcard. If you find this hard to believe, just google `hard links`.
 Moving on - after the first snapshot, there will always be two snapshots at a given time. How different these are depend on the number of hours at which each was taken (`bkpFreq`) - and modifications made to apps and respective data within that time frame.
-Backups survive regular TWRP factory resets. If you want another layer of safety, use rsync to copy these to SDcard or remote location. Beware however that the destination must be a Linux filesystem (e.g., F2FS, EXT[2-4], Btrfs). Why? Mainly because app data contains symbolic links - which can't be stored in mainstream SDcard filesystems - namely those of the FAT (File Allocation Table) family.
+Backups survive regular TWRP factory resets. If you want another layer of safety, use rsync to copy these to SDcard or remote location -- e.g., `bkp -a --del $backupsDir /mnt/media*/*/migrator`, `bkp -a --del -e "ssh -i <path to ssh key>" $backupsDir user@host:/<destination>`. Beware however that the destination must be a Linux filesystem (e.g., F2FS, EXT[2-4], Btrfs). Why? Mainly because app data contains symbolic links - which can't be stored in mainstream SDcard filesystems - namely those of the FAT (File Allocation Table) family. A workaround is creating an EXT4 image in the SDcard and saving backups there. Run `su -c /sbin/imgtool create <img> <size>` to create the image (size is interpreted in Megabytes). Mount the image with `su -c /sbin/imgtool mount <img> <mount point>`. Many users may find this complicated. I will automate this process at some point. Meanwhile, using a secondary SDcard partition (with the appropriate filesystem) is much easier.
 
 Once the system has fully booted, apps are reinstalled and respective data - instantly moved back to /data/data/. The final step of each individual app restore implies recreating library symbolic link, setting data ownership and filesystem permissions, and restoring SELinux context. Apps are disabled before data restore and re-enabled afterwards.
 
@@ -55,37 +55,39 @@ Note: all CPU architectures are supported. I only provide ARM and x86 rsync bina
 
 bkpFreq=8 -- Incremental backup frequency in hours - the value must be an integer (default: 8).
 
-disable <module ID> -- Disable Magisk modules after data migration and factory reset. e.g., `disable xposed`
-
-inc <egrep pattern> -- Include packages in migrations and backups. If <package name> is not specified, all user apps are included. e.g., `inc faceb`, `inc sp.*fy|whatsa|dukto`
+disable <module ID> -- Disable Magisk modules after data migration and factory reset. This supports wildcards. e.g., `disable *xposed*`
 
 exc <egrep pattern> -- Exclude packages from migrations and backups. e.g., `exc pitchblack`, `exc google`
+
+inc <egrep pattern> -- Include packages in migrations and backups. If <package name> is not specified, all user apps are included. e.g., `inc faceb`, `inc sp.*fy|whatsa|dukto`
 
 noapps -- Do not migrate/auto-restore apps.
 
 nobkp -- Disable automatic backups.
 
-nowipe -- Do not auto-wipe /data and /cache. Note that this means extra data (e.g., system settings, Magisk modules) won't be preserved.
+nowipe -- Do not auto-wipe /data. Note that this means extra data (e.g., system settings, Magisk modules) won't be preserved.
 
 
 *Advanced*
-
-remove <paths> -- Remove <paths> after factory reset. This can be used to remove virtually anything (including Magisk modules). Its main purpose is excluding problematic data from migration/preservation. Refer to *Default Configuration* below for examples.
 
 bkp <extra rsync option(s)> <source(s)> <destination> -- Advanced incremental, scheduled backups (rsync -rtu --inplace $bkp_line)
 
 For rsync-specific details, refer to rsync's man page.
 
+remove <paths> -- Remove <paths> after factory reset. This can be used to remove virtually anything (including Magisk modules). Its main purpose is excluding problematic data from migration/preservation. This supports wildcards. e.g., `remove $MOUNTPATH/*xposed*`
+
+threads=8 -- The higher the number, the faster apps+data migration runs (at the cost of higher CPU power and RAM usages). Obviously you should not abuse this.
+
 *Examples (advanced)*
 
-Backup a few internal folders to external storage
-- bkp --del /sdcard/Download /sdcard/Dukto /mnt/media*/*/important_data
+Backup backed up apps and respective data to external storage
+- bkp -a --del $backupsDir /mnt/media*/*/migrator
 
 Backup data to a remote machine
 - bkp -e "ssh -i <path to ssh key>" <source(s)> user@host:/<destination>
 
 Backup backed up apps and respective data to a remote machine
-- bkp -e "ssh -i <path to ssh key>" $backupsDir user@host:/<destination>
+- bkp -a --del -e "ssh -i <path to ssh key>" $backupsDir user@host:/<destination>
 
 
 *Default Configuration*
@@ -97,56 +99,47 @@ Backup backed up apps and respective data to a remote machine
 threads=8
 bkpFreq=8
 inc terminal
+inc topjohnwu
 #exc pitchblack
-
-disable xposed
-
-#remove $MOUNTPATH/xposed
-
-#remove /data/user*/*.provider* /data/user*/*.bookmarkprovider
-
-#remove /data/system*/0/ /data/system*/sync/ /data/system*/users/
-
-#remove /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img`
+disable *xposed*
+#remove $MOUNTPATH/*xposed*`
 
 
 
 ---
 #### SETUP STEPS
 
+
 - Install
+
 1. Flash the zip in Magisk Manager or custom recovery.
 2. Reboot.
 3. Customize config.txt (optional).
 
+
 - Uninstall
+
 1. Use Magisk Manager (app) or Magisk Manager for Recovery Mode (utility).
 2. Reboot.
 3. Remove `/data/media/migrator` (optional).
 
 
-- ROM Migration
+- Migrate
 
-0. *You may want to backup SMS/MMS messages, contacts and call logs using other means. Currently these are not guaranteed to be migrated fully/successfully.*
+0. *You may want to backup SMS/MMS messages, contacts and call logs using other means. Currently these are not guaranteed to be migrated fully/successfully.
 
-1. Reflash the same version from custom recovery to migrate data. /data and /cache are automatically wiped afterwards.
+1. Reflash the same version from custom recovery to migrate data. /data is automatically wiped afterwards. Relevant data remains intact.
 
-2. Disable, remove or update platform dependent Magisk modules before rebooting to the new system! A good example is Xposed Framework. You don't want - for instance, systemless Xposed for Nougat on Oreo and vice versa. After migration, Magisk image is automatically mounted to /M, so that users can disable/remove modules with ease. Recall that, you can also use the config constructs `disable <module ID>` or `remove $MOUNTPATH/<module ID>`, as described in the `CONFIG` section above.
+2. Disable, remove or update platform dependent Magisk modules before rebooting to the new system! A good example is Xposed Framework. You don't want - for instance, systemless Xposed for Nougat on Oreo and vice versa. After migration, Magisk image is automatically mounted to /M, so that users can disable/remove modules with ease. Recall that you can also use the config constructs `disable <module ID>` or `remove $MOUNTPATH/<module ID>`, as described in the `CONFIG` section above.
 
-3. *Reboot recovery*.
+3. Format cache, system, etc. - according to your ROM installation instructions. Do NOT wipe /data!
 
-4. Install new ROM, kernel, Magisk, GApps, etc., and you're done. Again, you must flash Magisk, not Magisk modules - these are preserved. Shortly after boot, apps will start popping on the app drawer, one by one.
+4. Flash ROM, vendor, kernel, Magisk, GApps, etc., and you're done. Recall that Magisk modules don't have to be reinstalled - these are preserved.
+Shortly after boot, apps will start popping on the app drawer, one by one.
 
+5. If you are migrating to a lower Android version (e.g., from 8.1 to 7.1.2) or to an entirely different league (e.g. from MIUI to AOSP), you may face issues (such as bootloop or apps force-closing) due to potentially incompatible system data. To prevent this right away, run `sh /data/M` before rebooting. If you already rebooted and the issues are real, go back to recovery and run that command. If even after this, you still face issues, perform a regular factory reset. Migrated apps and respective data survive that. Before the factory reset, you can backup (move) /data/adb/, /data/ssh/, etc. to /data/media/ to preserve Magisk modules, SSH keys and settings, and more. Just remember not to keep any system-specific (problematic) data. If you're not preserving anything, don't forget to Install Magisk and Migrator after the factory reset.
 
-
----
-#### NOTES/TIPS
-
-`/data/user*/*.provider* /data/user*/*.bookmarkprovider` match content providers' data (e.g., contacts, SMS/MMS messages, call logs). Unfortunately, this kind of data is not guaranteed to work across different Android versions or heavily distinct ROMs (e.g., LineageOS - stock). If you face issues such as constantly crashing Phone, Contacts, Messaging or similar app - run `su -c rm -rf /data/user*/*.provider* /data/user*/*.bookmarkprovider`. Reboot if the problem persists.
-
-The automatic restore has a fail-safe mechanism -- it runs at most 3 times, as needed. Apps usually fail to install due to missing dependencies and/or incompatible Android version. After the 3rd failed attempt, `/data/media/migrator/failed_restores` is renamed to `failed_restores.old`. If you revert to the original name, you get 3 more restore attempts on the next boot. You can also restore manually at any time - `su -c M`.
-
-The higher the number of `threads` is, the faster apps+data migration runs (at the cost of higher CPU power and RAM usages). Obviously you should not abuse this.
+Note: the automatic restore has a fail-safe mechanism -- it runs at most 3 times, as needed. Apps usually fail to install due to missing dependencies and/or incompatible Android version. After the 3rd failed attempt, `/data/media/migrator/failed_restores` is renamed to `failed_restores.old`. If you revert to the original name, you get 3 more restore attempts on the next boot. You can also restore manually at any time with the wizard - `M`. `migrated_data*` and `failed_restores*` folders are refreshed automatically whenever you migrate ROMs. These can be manually removed after migration to save space. You know the restore process is done when `/data/media/migrator/migrated_data/` is gone.
 
 
 
@@ -154,7 +147,7 @@ The higher the number of `threads` is, the faster apps+data migration runs (at t
 #### TERMINAL
 
 - Running `migrator` or `M` as root launches a wizard. Included options are incremental backups, data restore, and more.
-- `M -v (or --verbose)` or `touch /data/media/migrator/verbose` enable verbose. To prevent persistent overhead and storage space hijacking, this is valid for a single session only.
+- `M -v (or --verbose)` or `touch /data/media/migrator/verbose` enable verbose. To prevent persistent overhead and storage space hijacking, this is valid for a single session only. Verbose is always enabled for automatic restores.
 
 
 
@@ -163,13 +156,13 @@ The higher the number of `threads` is, the faster apps+data migration runs (at t
 
 `$bkpFreq` for `bkp <extra rsync option(s)> <source(s)> <destination>` is `$((bkpFreq + 3600))`. That is, one hour after the set value. This prevents conflicts with bkp_appdata().
 
-If `/data/media/migrator/config.txt` is missing, `$modPath/default_config.txt` is automatically copied to that location on the next launch.
+Default config is automatically set if `/data/media/migrator/config.txt` is missing.
 
 If the file `/data/.migrator` exists during a reflash, migrator reinstalls itself. No data migration/wipe is performed.
 
 Logs are stored at `/data/media/migrator/logs/`.
 
-Migrated data includes `adb/, app/, /data/user*/*/.*provider.*/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/([0-99]/accounts.*|storage.xml|sync/accounts.*|users/), data/.*provider.* and /cache/magisk.img`.
+Preserved data includes `adb/, app/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, system.*/([0-99]/accounts.*|storage.xml|sync/accounts.*|users/), user*/*/.*\.provider.* and /data/user*/*/.*\.bookmarkprovider`.
 
 
 
@@ -190,6 +183,16 @@ Migrated data includes `adb/, app/, /data/user*/*/.*provider.*/, misc/(adb/|blue
 ---
 #### LATEST CHANGES
 
+**2019.2.12 (201902120)**
+- Better compatibility (more data preserved)
+- Code and config cleanup
+- Fix issues (such as bootloop or apps force-closing) caused by incompatible system data - by running `sh /data/M` in recovery. Refer to README.md for details.
+- Fixed <some apps not being backed up or migrated>
+- General fixes & optimizations
+- Include Magisk Manager in backups and migration (`inc topjohnwu`).
+- Updated documentation -- refreshed migration and backup instructions, and more.
+- Verbose is always enabled for automatic restores.
+
 **2019.2.8 (201902080)**
 - All CPU architectures are now supported. I only provide ARM and x86 rsync binaries, though. Only the more advanced backups need rsync.
 - Auto-backup config before upgrades. Also, try patching it instead of overwriting.
@@ -206,13 +209,3 @@ Migrated data includes `adb/, app/, /data/user*/*/.*provider.*/, misc/(adb/|blue
 **2019.2.3.1 (201902031)**
 - Fixed app data backup logic error.
 - Wizard option 7 can also remove backups of excluded apps.
-
-**2019.2.3 (201902030)**
-- Added [Telegram group link](https://t.me/migrator_magisk/).
-- Customizable multithreading for apps+data migration.
-- Do not retry app restore after the 3rd failed attempt. This can be overridden. Refer to README.md for details.
-- General fixes & optimizations
-- Reverted "do not preserve system settings by default" (false alarm).
-- Show package names during apps+data migration.
-- Updated documentation and config.
-- Wait until pm (package manager) is ready before initiating app restore.

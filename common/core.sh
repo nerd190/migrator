@@ -37,7 +37,7 @@ backup() {
     set -e
     for pkg in $(awk '{print $1}' $pkgList); do
       [ $thread -gt $threads ] && { wait; thread=0; }
-      if ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/'; then
+      if ! grep "\"$pkg\" codePath" /data/system/packages.xml | grep -q 'codePath=\"/data/'; then
         if match_test inc $pkg && ! match_test exc $pkg; then
           thread=$(( thread + 1 )) || :
           (pkg=$pkg; apps_and_data) &
@@ -67,8 +67,8 @@ apps_and_data() {
   echo "  - $pkg"
   cp -al /data/data/$pkg $backupsDir/
   set +eo pipefail
-  ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
-    || cp -al $(grep name=\"$pkg\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
+  ! grep "\"$pkg\" codePath" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
+    || cp -al $(grep "\"$pkg\" codePath" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
       $backupsDir/$pkg.apk 2>/dev/null
   set -eo pipefail
 }
@@ -123,7 +123,10 @@ restore_on_boot() {
         else
           pm install $migratedData/$pkg.apk 1>/dev/null
         fi
-        [ $? -eq 0 ] && refresh_apk_backups $pkg
+        if [ $? -eq 0 ]; then
+          rm $migratedData/$pkg.apk
+          refresh_apk_backups $pkg
+        fi
       fi
       if grep -q "^$pkg " $pkgList; then
         pm disable $pkg 1>/dev/null
@@ -185,7 +188,7 @@ match_test() {
 
 # $1 -- <package name>
 symlink_lib() {
-  local lib=$(grep name=\"$pkg\" /data/system/packages.xml | awk '{print $4}' | sed 's/native[^=]*="//;s/"//')
+  local lib=$(grep "\"$pkg\" codePath" /data/system/packages.xml | awk '{print $4}' | sed 's/native[^=]*="//;s/"//')
   ln -fs $lib/* /data/data/$1/lib 2>/dev/null
 }
 

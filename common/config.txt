@@ -9,14 +9,7 @@ inc
 threads=8
 bkpFreq=8
 inc terminal
+inc topjohnwu
 #exc pitchblack
-
-disable xposed
-
-#remove $MOUNTPATH/xposed
-
-#remove /data/user*/*.provider* /data/user*/*.bookmarkprovider
-
-#remove /data/system*/0/ /data/system*/sync/ /data/system*/users/
-
-#remove /data/adb/ /data/misc/adb/ /data/misc/bluedroid/ /data/misc/wifi/ /data/ssh/ /cache/magisk*img
+disable *xposed*
+#remove $MOUNTPATH/*xposed*

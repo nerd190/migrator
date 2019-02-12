@@ -4,6 +4,7 @@
 # License: GPL V3+
 
 (modPath=${0%/*}
+modData=/data/media/migrator
 log=/data/media/migrator/logs/boot.log
 
 umask 0
@@ -16,8 +17,8 @@ until [ -d /data/media/0/?ndroid ]; do sleep 10; done
 mkdir -p ${log%/*}
 [ -f $log ] && grep -q .. $log && mv $log $log.old
 exec 1>$log 2>&1
-if [ -f /data/media/migrator/verbose ]; then
-  rm /data/media/migrator/verbose
+if [ -f $modData/verbose ] || [ -d $modData/migrated_data ]; then
+  rm $modData/verbose 2>/dev/null || :
   set -x
 fi
 

@@ -161,18 +161,27 @@ install_module() {
   mv -f License* README* $modInfo/
   mv $MODPATH/config.txt $MODPATH/default_config.txt
 
-  # set default config
+  # patch/set config
+  set +e
   if [ ! -f $config ] || [ $curVer -lt 201902080 ] || [ $curVer -gt $(i versionCode) ]; then
-    set +e
     rm $config.older 2>/dev/null
     mv $config.old $config.older 2>/dev/null
     mv $config $config.old 2>/dev/null
-    set -e
     cp -f $MODPATH/default_config.txt $config
   fi
 
-  rm /data/.migrator 2>/dev/null || :
-  set +euxo pipefail
+  if [ $curVer -lt 201902120 ]; then
+    grep -q topjohnwu $config || echo "inc topjohnwu" >> $config
+    sed -i '/^#remove /d' $config
+    grep -q '^#remove $MOUNTPATH/\*xposed\*' $config \
+      || echo "#remove $MOUNTPATH/*xposed*" >> $config
+    sed -i '/^disable xposed/d' $config
+    grep -q '^disable \*xposed\*' $config \
+      || echo "disable *xposed*" >> $config
+  fi
+
+  rm /data/.migrator 2>/dev/null
+  set +uxo pipefail
 }
 
 
@@ -201,7 +210,7 @@ factory_reset() {
     # wipe data
     if ! grep -iq '^nowipe' $config 2>/dev/null; then
       leaveImgMounted=true
-      ui_print "- Wiping /data and /cache..."
+      ui_print "- Wiping /data..."
 
       for e in $(ls -1A /data 2>/dev/null \
         | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$|^user' 2>/dev/null)
@@ -213,6 +222,18 @@ factory_reset() {
         | grep -Ev '^/.*:$|\.provider|\.bookmarkprovider' 2>/dev/null)
       do
         rm -rf /data/data/$e
+      done
+
+      for e in $(ls -1A /data/user*/*/*.bookmarkprovider 2>/dev/null \
+        | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
+      do
+        rm -rf /data/user*/*/*.bookmarkprovider/$e
+      done
+
+      for e in $(ls -1A /data/user*/*/*.provider* 2>/dev/null \
+        | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
+      do
+        rm -rf /user*/*/*.provider*/$e
       done
 
       for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
@@ -233,7 +254,7 @@ factory_reset() {
       done
 
       for e in $(ls -1A /data/system*/[0-99] 2>/dev/null \
-        | grep -Ev '^/.*:$|^accounts.*db$|^accounts.*al$' 2>/dev/null)
+        | grep -Ev '^/.*:$|^accounts.*db.*' 2>/dev/null)
       do
         rm -rf /data/system*/[0-99]/$e
       done
@@ -242,24 +263,20 @@ factory_reset() {
         rm -rf $d
       done
 
-      if mount -o remount,rw /cache 2>/dev/null; then
-        for e in $(ls -1A /cache 2>/dev/null | grep -v '^magisk*img$' 2>/dev/null); do
-          rm -rf /cache/$e
-        done
-      fi
-
       set +eo pipefail
       # disable <module ID>
-      grep '^disable' $config | while IFS= read -r line; do
+      grep '^disable' $config 2>/dev/null | while IFS= read -r line; do
         echo $line | grep -q disable.. && eval 'touch $MOUNTPATH/$(echo $line | sed 's/^disable//') 2>/dev/null'
       done
 
       # removes <paths>
-      grep '^remove' $config | while IFS= read -r line; do
+      grep '^remove' $config 2>/dev/null | while IFS= read -r line; do
         echo $line | grep -q remove.. && eval 'rm -rf $(echo $line | sed 's/^remove//') 2>/dev/null'
       done
 
     fi
+    # script for fixing bootloop and other issues
+    echo "cd /data; rm -rf system/sync system/users M 2>/dev/nul || :" > /data/M
     exxit 0
   fi
 }
@@ -278,7 +295,7 @@ migrate() {
     set -e
     for pkg in $(awk '{print $1}' $pkgList); do
       [ $thread -gt $threads ] && { wait; thread=0; }
-      if ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/'; then
+      if ! grep "\"$pkg\" codePath" /data/system/packages.xml | grep -q 'codePath=\"/data/'; then
         if match_test inc $pkg && ! match_test exc $pkg; then
           thread=$(( thread + 1 )) || :
           (pkg=$pkg; apps_and_data) &
@@ -301,8 +318,8 @@ apps_and_data() {
   ui_print "  - $pkg"
   mv /data/data/$pkg $migratedData/
   set +eo pipefail
-  ! grep name=\"$pkg\" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
-    || mv $(grep name=\"$pkg\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
+  ! grep "\"$pkg\" codePath" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
+    || mv $(grep "\"$pkg\" codePath" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
       $migratedData/$pkg.apk 2>/dev/null
   set -eo pipefail
 }
