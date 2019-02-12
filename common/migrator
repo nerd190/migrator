@@ -88,7 +88,6 @@ rsync_util() {
 
 restore_apps() {
   local pkg=""
-  local backupsDirOrig=$modData/backups
   restore_from
   if ls $backupsDir 2>/dev/null | grep -q \.apk; then
     : > $tmpDir/pkg_list0
@@ -250,7 +249,6 @@ mk_list() {
 restore() {
   local pkg=""
   local owner=""
-  local backupsDirOrig=$modData/backups
   set +e
   echo
   echo "Restoring $1..."
@@ -297,7 +295,7 @@ exit_or_not() {
 
 
 restore_from() {
-  local o="" backupsDirOrig=$backupsDir
+  local o=""
   echo "(?) Restore from..."
   echo
   select o in $backupsDir $backupsDir.old \

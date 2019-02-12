@@ -9,6 +9,7 @@ rsync=$modPath/bin/rsync
 modData=/data/media/$modId
 config=$modData/config.txt
 backupsDir=$modData/backups
+backupsDirOrig=$backupsDir
 pkgList=/data/system/packages.list
 failedRes=$modData/failed_restores
 migratedData=$modData/migrated_data

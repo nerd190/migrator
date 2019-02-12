@@ -183,6 +183,9 @@ Preserved data includes `adb/, app/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, s
 ---
 #### LATEST CHANGES
 
+**2019.2.12-r2 (201902121)**
+- Fixed "unset parameter" error during automatic restore. Those who tried to migrate recently and the automatic restore failed, install this update, rename /data/media/migrator/`failed_restores.old` to `failed_restores` and reboot. The automatic restore should resume. Alternatively, apps+data can be restored manually and directly from `failed_restores.old`, using the wizard - even the previous version.
+
 **2019.2.12 (201902120)**
 - Better compatibility (more data preserved)
 - Code and config cleanup
