@@ -197,13 +197,11 @@ symlink_lib() {
 # $1 -- <package name>
 refresh_apk_backups() {
   if grep -q "^$1 " $pkgList; then
-    set +eo pipefail
     rm $backupsDirOrig/$1.apk 2>/dev/null \
       && cp -al $(grep name=\"$1\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
         $backupsDirOrig/$1.apk
     rm $backupsDirOrig.old/$1.apk 2>/dev/null \
       && cp -al $(grep name=\"$1\" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
         $backupsDirOrig.old/$1.apk
-    set -eo pipefail
   fi
 }

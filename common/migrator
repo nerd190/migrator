@@ -107,7 +107,9 @@ restore_apps() {
         else
           pm install $backupsDir/$pkg 1>/dev/null || :
         fi
+        set +eo pipefail
         [ $? -eq 0 ] && refresh_apk_backups ${pkg%.apk}
+        set -eo pipefail
         echo
       done
       post_restore apps apps
@@ -249,7 +251,7 @@ mk_list() {
 restore() {
   local pkg=""
   local owner=""
-  set +e
+  set +eo pipefail
   echo
   echo "Restoring $1..."
   for pkg in $(cat $tmpDir/pkg_list); do
@@ -277,7 +279,7 @@ restore() {
       pm enable $pkg 1>/dev/null
     fi
   done
-  set -e
+  set -eo pipefail
   post_restore $1 $2
 }
 

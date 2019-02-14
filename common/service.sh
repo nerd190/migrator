@@ -1,14 +1,19 @@
 #!/system/bin/sh
+# service.sh, post-fs-data.sh
 # Migrator Auto-start Script
 # Copyright (C) 2018-2019, VR25 @ xda-developers
 # License: GPL V3+
 
 (modPath=${0%/*}
+tmpDir=/dev/migrator
 modData=/data/media/migrator
 log=/data/media/migrator/logs/boot.log
 
 umask 0
 set -euo pipefail
+
+# don't run more than once per boot session
+[ -d $tmpDir ] && exit 0 || mkdir -p $tmpDir
 
 # wait until /data is decrypted
 until [ -d /data/media/0/?ndroid ]; do sleep 10; done

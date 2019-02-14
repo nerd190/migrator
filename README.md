@@ -183,6 +183,10 @@ Preserved data includes `adb/, app/, misc/(adb/|bluedroid/|vold/|wifi/), ssh/, s
 ---
 #### LATEST CHANGES
 
+**2019.2.14 (201902140)**
+- General fixes & optimizations
+- Workaround for Magisk service.sh bug (script not executed)
+
 **2019.2.12-r3 (201902122)**
 - Fixed "refresh_backups not found".
 

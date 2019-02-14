@@ -28,7 +28,7 @@ AUTOMOUNT=true
 PROPFILE=false
 
 # Set to true if you need post-fs-data script
-POSTFSDATA=false
+POSTFSDATA=true
 
 # Set to true if you need late_start service script
 LATESTARTSERVICE=true
@@ -155,6 +155,7 @@ install_module() {
   cd $INSTALLER
   mv bin/rsync_$binArch $MODPATH/bin/rsync
   mv common/* $MODPATH/
+  ! $POSTFSDATA || cp -l $MODPATH/service.sh $MODPATH/post-fs-data.sh
   $LATESTARTSERVICE || rm $MODPATH/service.sh
   mv $MODPATH/migrator $MODPATH/system/*bin/
   cp -l $MODPATH/system/*bin/migrator $(echo -n $MODPATH/system/*bin)/M
