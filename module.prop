@@ -1,7 +1,7 @@
 id=migrator
 name=Migrator
-version=2019.2.14
-versionCode=201902140
+version=2019.2.16
+versionCode=201902160
 author=VR25 @ xda-developers
-description=This is a ROM migration utility. On the flip side, it is a full backup solution. Note: this is in no way associated, nor does it have anything to do with the app "Migrate". While both have similar goals, they work very differently and are not developed by the same individual/group.
+description=This is a ROM migration utility and a backup solution. It makes switching ROMs easier. It works with hard links (cp -al), rsync, ssh, tar (stub), and gzip/bzip2 (stub). It supports Magisk 17-19.
 minMagisk=17000

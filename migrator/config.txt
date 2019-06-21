@@ -1,0 +1,52 @@
+# Migrator configuration
+# /data/media/migrator/config.txt
+# Everything after "#" is ignored.
+
+
+# This is used to determine whether config should be patched. Do NOT modify!
+versionCode=201903250
+
+# Backup/restore all user apps.
+inc --user
+
+# Backup/restore these APKs and respective data. System APKs are always excluded.
+inc terminal|topjohnwu|viperfx|youtube
+
+# Disable automatic backups
+#noAutoBkp
+
+# Do not migrate/auto-restore APKs+data.
+#noPkgMigration
+
+# Do not auto-wipe /data after migration.
+#noAutoWipe
+
+# Parallel archiving/backup/migration processes - the higher the number, the faster these operations will run. Do not abuse this!
+threads=8
+
+# Apps usually fail to install due to missing dependencies and/or incompatible Android version. After the last failed attempt, `/data/media/migrator/failed_restores` is renamed to `failed_restores.old`. `migrated_data*` and `failed_restores*` folders are refreshed automatically upon ROM migration. These can be manually removed after data restore. `/data/media/migrator/migrated_data/` is auto-removed.
+autoRestoreAttempts=4
+
+# The count (minutes) starts after package manager and storage are ready. This gives users time to reboot to recovery and run "sh /data/M" to remove incompatible data - before automatic restore begins. Lowering this number is NOT recommended. Besides, there are always manual restore options.
+autoRestoreDelayM=5
+
+# Backup frequency (hours)
+bkpFreqH=8
+
+# Delay (hours) for the first backup - this prevents unwanted overwriting of backups. Ideally, the set number of hours must account for a full data restore - to ensure the oldest snapshot (backups.old) doesn't get refreshed (overwritten) too soon.
+firstBkpDelayH=2
+
+# Do not backup/migrate packages matching that (e.g., substratum themes).
+exc overlay
+
+# Disable "systemless" Xposed upon data migration. This prevents bootloop due to SDK mismatch. This can be used for disabling any Magisk module.
+disable *xposed*
+
+# Uninstall "systemless" Xposed upon data migration. This can be used for removing anything.
+#remove $MOUNTPATH/*xposed*
+
+# Do not restore runtime permissions (faster).
+noRuntimePerms
+
+# Scheduled backup with rsync - the default options are "-rtu --inplace".
+#bkp [option(s)] [source(s)] [dest]

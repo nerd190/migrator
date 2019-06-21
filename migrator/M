@@ -1,0 +1,129 @@
+#!/sbin/sh
+# Migrator /data wipe wizard (recovery mode)
+# Copyright (C) 2019, VR25 @ xda-developers
+# License: GPLv3+
+
+
+PS3="
+(?) Additional data to wipe: "
+
+
+finish() {
+  local ans=y
+  echo -n "
+(?) Are you done? (Y/n) "
+  read ans
+  [[ ${ans:-y} == [yY]* ]] && break
+  echo
+}
+
+
+# factory reset
+
+echo "
+(i) Wiping /data..."
+
+for target in $(ls -1A /data 2>/dev/null \
+  | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$|^user|^M$' 2>/dev/null)
+do
+  rm -rf /data/$target
+done
+
+for target in $(ls -1A /data/user*/* 2>/dev/null \
+  | grep -Ev '^/.*:$|\.provider|\.bookmarkprovider' 2>/dev/null)
+do
+  rm -rf /data/data/$target
+done
+
+for target in $(ls -1A /data/user*/*/*.bookmarkprovider 2>/dev/null \
+  | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
+do
+  rm -rf /data/user*/*/*.bookmarkprovider/$target
+done
+
+for target in $(ls -1A /data/user*/*/*.provider* 2>/dev/null \
+  | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
+do
+  rm -rf /user*/*/*.provider*/$target
+done
+
+for target in $(ls -1A /data/misc 2>/dev/null \
+  | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
+do
+  rm -rf /data/misc/$target
+done
+
+for target in $(ls -1A /data/system* 2>/dev/null \
+  | grep -Ev '^/.*:$|^[0-99]$|^sync$|^storage.xml$|^users$' 2>/dev/null)
+do
+  rm -rf /data/system*/$target
+done
+
+for target in $(ls -1A /data/system/sync 2>/dev/null \
+  | grep -v '^accounts.xml$' 2>/dev/null)
+do
+  rm -rf /data/system/sync/$target
+done
+
+for target in $(ls -1A /data/system*/[0-99] 2>/dev/null \
+  | grep -Ev '^/.*:$|^accounts.*db.*' 2>/dev/null)
+do
+  rm -rf /data/system*/[0-99]/$target
+done
+
+for target in $(find /data/system/users \
+  -type d -name registered_services 2>/dev/null)
+do
+  rm -rf $target
+done
+
+
+# wipe additional data
+echo
+
+select target in Accounts \
+  "Bluetooth settings" \
+  "Content providers" \
+  "Users and system settings (exc. accounts)" \
+  "Wi-Fi settings" \
+  "All of the above" \
+  "-- Exit --"
+do
+  case $target in
+    Ac*)
+      rm /data/system/sync/accounts.xml \
+        /data/system*/[0-99]/accounts*db*
+      finish
+    ;;
+    B*)
+      rm -rf /data/misc/bluedroid/
+      finish
+    ;;
+    C*)
+      rm -rf /data/user*/*.provider*/databases/
+        /data/user*/*.bookmarkprovider/databases/
+      finish
+    ;;
+    U*)
+      find /data/system* ! -type d \
+        | grep -Ev 'accounts.*(db.*|xml)' \
+          | xargs rm
+      find /data/system* -type d | xargs rmdir
+      finish
+    ;;
+    W*)
+      rm -rf /data/misc/wifi/
+      finish
+    ;;
+    Al*)
+      echo "(i) Use TWRP itself to factory reset."
+      break
+    ;;
+    -*)
+      break
+    ;;
+  esac 2>/dev/null
+done
+
+echo
+exit $?

@@ -40,10 +40,9 @@ LATESTARTSERVICE=true
 # Set what you want to show when installing your mod
 
 print_modname() {
-  i() { grep_prop $1 $INSTALLER/module.prop; }
   ui_print " "
-  ui_print "$(i name) $(i version)"
-  ui_print "$(i author)"
+  ui_print "$name  $version"
+  ui_print "$author"
   ui_print " "
 }
 
@@ -108,7 +107,7 @@ set_permissions() {
 install_module() {
 
   set -euxo pipefail
-  trap 'exxit $? $? 1>/dev/null 2>&1' EXIT
+  trap 'exxit $?' EXIT
 
   leaveImgMounted=false
   modData=/data/media/$MODID
@@ -125,8 +124,7 @@ install_module() {
     [ -d $MOUNTPATH0 ] || MOUNTPATH0=/sbin/.core/img
   fi
 
-  curVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || :)
-  [ -z "$curVer" ] && curVer=0
+  currVer=$(grep_prop versionCode $MOUNTPATH0/$MODID/module.prop || echo 0)
 
   # get CPU arch
   case "$ARCH" in
@@ -144,11 +142,6 @@ install_module() {
   [ -d /system/xbin ] && mkdir -p $MODPATH/system/xbin \
     || mkdir -p $MODPATH/system/bin
 
-  # remove legacy version
-  if touch $MOUNTPATH0/adk/remove 2>/dev/null; then
-    [ -f $config ] || mv /data/media/adk/config.txt $config 2>/dev/null || :
-  fi
-
   # extract module files
   ui_print "- Extracting module files"
   unzip -o "$ZIP" -d $INSTALLER >&2
@@ -158,27 +151,15 @@ install_module() {
   ! $POSTFSDATA || cp -l $MODPATH/service.sh $MODPATH/post-fs-data.sh
   $LATESTARTSERVICE || rm $MODPATH/service.sh
   mv $MODPATH/migrator $MODPATH/system/*bin/
-  cp -l $MODPATH/system/*bin/migrator $(echo -n $MODPATH/system/*bin)/M
+  cp -l $MODPATH/system/*bin/migrator $(echo $MODPATH/system/*bin)/M
   mv -f License* README* $modInfo/
-  mv $MODPATH/config.txt $MODPATH/default_config.txt
 
   # patch/set config
   set +e
-  if [ ! -f $config ] || [ $curVer -lt 201902080 ] || [ $curVer -gt $(i versionCode) ]; then
-    rm $config.older 2>/dev/null
-    mv $config.old $config.older 2>/dev/null
+  if [ -f $config ] && [ 0$(grep_prop versionCode $config) -lt 0201903250 ]; then
+    rm $config.old* 2>/dev/null
     mv $config $config.old 2>/dev/null
     cp -f $MODPATH/default_config.txt $config
-  fi
-
-  if [ $curVer -lt 201902120 ]; then
-    grep -q topjohnwu $config || echo "inc topjohnwu" >> $config
-    sed -i '/^#remove /d' $config
-    grep -q '^#remove $MOUNTPATH/\*xposed\*' $config \
-      || echo "#remove $MOUNTPATH/*xposed*" >> $config
-    sed -i '/^disable xposed/d' $config
-    grep -q '^disable \*xposed\*' $config \
-      || echo "disable *xposed*" >> $config
   fi
 
   rm /data/.migrator 2>/dev/null
@@ -188,96 +169,106 @@ install_module() {
 
 exxit() {
   set +euxo pipefail
-  if [ "x$2" != x0 ]; then
+  if [ $1 -ne 0 ]; then
     unmount_magisk_img
     $BOOTMODE || recovery_cleanup
     set -u
     rm -rf $TMPDIR
-  fi
+  fi 2>/dev/nul 1>&2
   if $leaveImgMounted; then
     mount -o rw /
     mkdir -p /M
-    mount /data/adb/magisk.img /M
+    mount /data/adb/magisk.img /M 2>/dev/null
   fi
+  echo
+  echo "***EXIT $1***"
+  echo
   exit $1
-}
+} 1>&2
 
 
 factory_reset() {
-  local d="" e="" line=""
-  if [ $curVer -eq $(i versionCode) ]; then
-    grep -iq '^noapps' $config 2>/dev/null || migrate
+  local d="" line=""
+  if [ $currVer -eq $versionCode ]; then
+    grep -iq '^noPkgMigration' $config 2>/dev/null || migrate
 
     # wipe data
-    if ! grep -iq '^nowipe' $config 2>/dev/null; then
+    if ! grep -iq '^noAutoWipe' $config 2>/dev/null; then
       leaveImgMounted=true
       ui_print "- Wiping /data..."
 
-      for e in $(ls -1A /data 2>/dev/null \
+      for target in $(ls -1A /data 2>/dev/null \
         | grep -Ev '^adb$|^data$|^media$|^misc$|^system|^ssh$|^user' 2>/dev/null)
       do
-        rm -rf /data/$e
+        rm -rf /data/$target
       done
 
-      for e in $(ls -1A /data/user*/* 2>/dev/null \
+      for target in $(ls -1A /data/user*/* 2>/dev/null \
         | grep -Ev '^/.*:$|\.provider|\.bookmarkprovider' 2>/dev/null)
       do
-        rm -rf /data/data/$e
+        rm -rf /data/data/$target
       done
 
-      for e in $(ls -1A /data/user*/*/*.bookmarkprovider 2>/dev/null \
+      for target in $(ls -1A /data/user*/*/*.bookmarkprovider 2>/dev/null \
         | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
       do
-        rm -rf /data/user*/*/*.bookmarkprovider/$e
+        rm -rf /data/user*/*/*.bookmarkprovider/$target
       done
 
-      for e in $(ls -1A /data/user*/*/*.provider* 2>/dev/null \
+      for target in $(ls -1A /data/user*/*/*.provider* 2>/dev/null \
         | grep -Ev '^/.*:$|/databases/' 2>/dev/null)
       do
-        rm -rf /user*/*/*.provider*/$e
+        rm -rf /user*/*/*.provider*/$target
       done
 
-      for e in $(ls -1A /data/misc 2>/dev/null | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
+      for target in $(ls -1A /data/misc 2>/dev/null \
+        | grep -Ev '^adb$|^bluedroid$|^vold$|^wifi$' 2>/dev/null)
       do
-        rm -rf /data/misc/$e
+        rm -rf /data/misc/$target
       done
 
-      for e in $(ls -1A /data/system* 2>/dev/null \
+      for target in $(ls -1A /data/system* 2>/dev/null \
         | grep -Ev '^/.*:$|^[0-99]$|^sync$|^storage.xml$|^users$' 2>/dev/null)
       do
-        rm -rf /data/system*/$e
+        rm -rf /data/system*/$target
       done
 
-      for e in $(ls -1A /data/system/sync 2>/dev/null \
+      for target in $(ls -1A /data/system/sync 2>/dev/null \
         | grep -v '^accounts.xml$' 2>/dev/null)
       do
-        rm -rf /data/system/sync/$e
+        rm -rf /data/system/sync/$target
       done
 
-      for e in $(ls -1A /data/system*/[0-99] 2>/dev/null \
+      for target in $(ls -1A /data/system*/[0-99] 2>/dev/null \
         | grep -Ev '^/.*:$|^accounts.*db.*' 2>/dev/null)
       do
-        rm -rf /data/system*/[0-99]/$e
+        rm -rf /data/system*/[0-99]/$target
       done
 
-      for d in $(find /data/system/users -type d -name registered_services 2>/dev/null); do
-        rm -rf $d
+      for target in $(find /data/system/users \
+        -type d -name registered_services 2>/dev/null)
+      do
+        rm -rf $target
       done
 
       set +eo pipefail
+
       # disable <module ID>
       grep '^disable' $config 2>/dev/null | while IFS= read -r line; do
         echo $line | grep -q disable.. && eval 'touch $MOUNTPATH/$(echo $line | sed 's/^disable//') 2>/dev/null'
       done
 
-      # removes <paths>
+      # remove <paths>
       grep '^remove' $config 2>/dev/null | while IFS= read -r line; do
         echo $line | grep -q remove.. && eval 'rm -rf $(echo $line | sed 's/^remove//') 2>/dev/null'
       done
 
     fi
+
     # script for fixing bootloop and other issues
-    echo "cd /data; rm -rf system/sync system/users M 2>/dev/nul || :" > /data/M
+    cd $INSTALLER
+    unzip -o "$ZIP" common/M -d $INSTALLER >&2
+    mv -f common/M /data/
     exxit 0
   fi
 }
@@ -286,8 +277,8 @@ factory_reset() {
 migrate() {
   local pkg="" thread=0
   local threads=$(( $(sed -n 's/^threads=//p' $config) - 1 )) || :
-  if grep -q '^inc' $config 2>/dev/null; then
-    ui_print "- Migrating ($((threads + 1)) threads)..."
+  if grep -q '^inc ' $config 2>/dev/null; then
+    ui_print "- Migrating apps+data (using $((threads + 1)) threads)..."
     set +e
     { rm -rf $failedRes.old $migratedData.old
     mv $failedRes $failedRes.old
@@ -303,7 +294,7 @@ migrate() {
         fi
       else
         if ! match_test exc $pkg; then
-          if grep -q '^inc$' $config || match_test inc $pkg; then
+          if grep -q '^inc --user' $config || match_test inc $pkg; then
             thread=$(( thread + 1 )) || :
             (pkg=$pkg; apps_and_data) &
           fi
@@ -320,8 +311,8 @@ apps_and_data() {
   mv /data/data/$pkg $migratedData/
   set +eo pipefail
   ! grep "\"$pkg\" codePath" /data/system/packages.xml | grep -q 'codePath=\"/data/' \
-    || mv $(grep "\"$pkg\" codePath" /data/system/packages.xml | awk '{print $3}' | sed 's/codePath="//;s/"//')/base.apk \
-      $migratedData/$pkg.apk 2>/dev/null
+    || mv $(grep "\"$pkg\" codePath" /data/system/packages.xml | awk '{print $3}' \
+      | sed 's/codePath="//;s/"//')/base.apk $migratedData/$pkg.apk 2>/dev/null
   set -eo pipefail
 }
 
@@ -337,6 +328,9 @@ match_test() {
 }
 
 
+print() { grep_prop $1 $INSTALLER/module.prop; }
+
+
 version_info() {
   local line=""
   local println=false
@@ -350,15 +344,18 @@ version_info() {
 
   ui_print " "
   ui_print "  WHAT'S NEW"
-  cat ${config%/*}/info/README.md | while read line; do
-    echo "$line" | grep -q '\*\*.*\(.*\)\*\*' && println=true
-    $println && echo "$line" | grep -q '^$' && break
-    $println && line="$(echo "    $line" | grep -v '\*\*.*\(.*\)\*\*')" && ui_print "$line"
+  cat ${config%/*}/info/README.md | while IFS= read -r line; do
+    if $println; then
+      echo "$line" | grep -q '^$' && break \
+        || { line="$(echo "    $line")" && ui_print "$line"; }
+    else
+      echo "$line" | grep -q \($versionCode\) && println=true
+    fi
   done
   ui_print " "
 
   ui_print "  LINKS"
-  ui_print "    - Donation: https://paypal.me/vr25xda/"
+  ui_print "    - Donate: https://paypal.me/vr25xda/"
   ui_print "    - Facebook page: facebook.com/VR25-at-xda-developers-258150974794782/"
   ui_print "    - Git repository: github.com/Magisk-Modules-Repo/migrator/"
   ui_print "    - Telegram channel: t.me/vr25_xda/"
@@ -367,3 +364,10 @@ version_info() {
   ui_print "    - XDA thread: forum.xda-developers.com/apps/magisk/magisk-module-app-data-keeper-adk-t3822278/"
   ui_print " "
 }
+
+
+author=$(print author)
+name=$(print name)
+version=$(print version)
+versionCode=$(print versionCode)
+unset -f print
